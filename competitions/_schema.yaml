@@ -1,0 +1,45 @@
+# Schema for competition configuration files.
+# Each competition must have its own YAML file in this directory.
+# Slug must match the filename (without .yaml) and the competitions.slug DB column.
+
+# ── Required fields ───────────────────────────────────────────────────────────
+
+slug: string           # unique identifier, e.g. "worldcup2026"
+name: string           # display name, e.g. "FIFA World Cup 2026"
+season: string         # e.g. "2026"
+competition_type: enum # "national_team" | "club_league" | "club_cup"
+
+# ── Dixon-Coles model parameters ──────────────────────────────────────────────
+
+model:
+  xi: float
+    # Time decay constant. Half-life = ln(2) / xi.
+    # National teams:  xi ≈ 0.0023  → half-life ≈ 300 days
+    # Club leagues:    xi ≈ 0.0065  → half-life ≈ 107 days
+  rho_init: float
+    # Initial guess for rho (correlation correction). Optimizer will adjust.
+    # Typical range: 0.03 - 0.15
+  max_goals: int
+    # Score matrix upper bound. Default 10 is fine for 99.9%+ of matches.
+
+# ── Decision pipeline parameters ─────────────────────────────────────────────
+
+edge:
+  min_edge: float      # minimum edge to flag as value bet (default 0.03 = 3%)
+
+kelly:
+  multiplier: float    # fractional Kelly multiplier (default 0.25 = quarter Kelly)
+
+risk:
+  max_bet_pct: float          # max stake per bet as % of bankroll (default 0.05)
+  max_daily_exposure_pct: float  # max total open bets per day as % (default 0.15)
+  min_odds: float             # reject bets below this decimal odds (default 1.30)
+  max_odds: float             # reject bets above this decimal odds (default 6.00)
+
+# ── Data sources ─────────────────────────────────────────────────────────────
+
+data:
+  fixture_source: string      # adapter class to use, e.g. "WorldCup2026FixtureSource"
+  odds_source: string         # adapter class to use, e.g. "TheOddsApiSource"
+  odds_sport_key: string      # provider-specific sport key
+  historical_source: string   # adapter class for training data

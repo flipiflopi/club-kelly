@@ -1,0 +1,27 @@
+slug: worldcup2026
+name: "FIFA World Cup 2026"
+season: "2026"
+competition_type: national_team
+
+model:
+  xi: 0.0023          # half-life ≈ 300 days (slower decay for national teams — they play infrequently)
+  rho_init: 0.08      # Dixon-Coles correlation correction initial estimate
+  max_goals: 10
+
+edge:
+  min_edge: 0.03      # only bet if model prob exceeds fair market prob by ≥ 3%
+
+kelly:
+  multiplier: 0.25    # quarter Kelly — conservative for paper trading calibration phase
+
+risk:
+  max_bet_pct: 0.05          # never stake more than 5% of bankroll on a single bet
+  max_daily_exposure_pct: 0.15  # max 15% of bankroll open simultaneously in a day
+  min_odds: 1.30             # ignore heavy favourites (little edge available)
+  max_odds: 6.00             # ignore long shots (model uncertainty too high)
+
+data:
+  fixture_source: WorldCup2026FixtureSource
+  odds_source: TheOddsApiSource
+  odds_sport_key: soccer_fifa_world_cup
+  historical_source: KaggleInternationalSource
