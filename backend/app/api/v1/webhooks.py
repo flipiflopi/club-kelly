@@ -13,13 +13,14 @@ All endpoints accept an optional X-API-Key header (see deps.verify_webhook_key).
 
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.app.api.deps import get_db_session, verify_webhook_key
 from backend.app.models.match import Match, MatchStatus
 from backend.app.services.bet_resolver import resolve_bets_for_match
+from backend.app.services.prediction_runner import RunResult, run_predictions
 
 logger = logging.getLogger(__name__)
 
@@ -96,17 +97,25 @@ def sync_results(db: Session = Depends(get_db_session)):
 
 
 @router.post("/run-predictions", response_model=RunPredictionsResponse)
-def run_predictions(db: Session = Depends(get_db_session)):
+def trigger_run_predictions(db: Session = Depends(get_db_session)):
     """
     Trigger: n8n calls this after sync-fixtures succeeds.
-    Evaluates all upcoming matches without predictions yet, runs the full
-    5-layer decision pipeline, and records any new simulated bets.
-    Full implementation: backend/app/services/prediction_runner.py (next sprint).
+    Runs the full 5-layer prediction pipeline for all active competitions.
+    Skips matches already evaluated with the current model version.
+    Returns immediately with a summary of what was processed.
     """
-    # TODO: wire prediction pipeline
-    logger.info("run-predictions webhook received")
+    result: RunResult = run_predictions(db)
+
+    status = "ok" if not result.errors else "partial_error"
+    if result.errors:
+        logger.warning(
+            "run-predictions completed with %d errors: %s",
+            len(result.errors),
+            result.errors[:3],  # log first 3 to avoid flooding
+        )
+
     return RunPredictionsResponse(
-        status="accepted",
-        matches_evaluated=0,
-        bets_placed=0,
+        status=status,
+        matches_evaluated=result.matches_evaluated,
+        bets_placed=result.bets_placed,
     )

@@ -30,5 +30,10 @@ class Prediction(Base, TimestampMixin):
     market_type: Mapped["MarketType"] = relationship(back_populates="predictions")  # type: ignore[name-defined]
     simulated_bet: Mapped["SimulatedBet | None"] = relationship(back_populates="prediction")  # type: ignore[name-defined]
 
+    @property
+    def market_slug(self) -> str:
+        """Convenience accessor used by Pydantic schemas (from_attributes=True)."""
+        return self.market_type.slug
+
     def __repr__(self) -> str:
         return f"<Prediction match={self.match_id} {self.outcome} p={self.model_probability:.3f}>"

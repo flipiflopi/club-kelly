@@ -129,6 +129,18 @@ class DixonColesModel(AbstractPredictionModel):
         self.max_goals = max_goals
         self._params: DixonColesParams | None = None
 
+    @classmethod
+    def from_params(
+        cls,
+        params: DixonColesParams,
+        xi: float = 0.0023,
+        max_goals: int = 10,
+    ) -> "DixonColesModel":
+        """Construct a ready-to-use model from pre-fitted parameters (e.g. loaded from DB)."""
+        model = cls(xi=xi, max_goals=max_goals)
+        model._params = params
+        return model
+
     # ── Public API ────────────────────────────────────────────────────────────
 
     def fit(self, matches: list[dict]) -> None:
