@@ -5,9 +5,9 @@ import { usePolling } from "../api/usePolling";
 import type { Bet, Match, Prediction } from "../types/api";
 
 const MARKET_NAMES: Record<string, string> = {
-  match_result: "Resultado 1X2",
-  over_under: "Más/Menos goles",
-  btts: "Ambos marcan",
+  match_result: "Match Result 1X2",
+  over_under: "Over / Under",
+  btts: "Both Teams to Score",
 };
 
 const OUTCOME_ORDER: Record<string, number> = { home: 0, draw: 1, away: 2 };
@@ -15,7 +15,7 @@ const OUTCOME_ORDER: Record<string, number> = { home: 0, draw: 1, away: 2 };
 function outcomeLabel(outcome: string, match: Match): string {
   if (outcome === "home") return match.home_team.name;
   if (outcome === "away") return match.away_team.name;
-  if (outcome === "draw") return "Empate";
+  if (outcome === "draw") return "Draw";
   return outcome;
 }
 
@@ -32,9 +32,9 @@ function dayKey(dateStr: string): string {
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate();
 
-  if (isSameDay(d, today)) return "Hoy";
-  if (isSameDay(d, tomorrow)) return "Mañana";
-  return d.toLocaleDateString("es-ES", {
+  if (isSameDay(d, today)) return "Today";
+  if (isSameDay(d, tomorrow)) return "Tomorrow";
+  return d.toLocaleDateString("en-GB", {
     weekday: "long",
     day: "numeric",
     month: "short",
@@ -88,7 +88,7 @@ function PredictionSection({ match }: { match: Match }) {
   if (byMarket.size === 0) {
     return (
       <p className="text-xs text-gray-400 py-3 text-center">
-        Sin predicciones disponibles aún
+        No predictions available yet
       </p>
     );
   }
@@ -132,14 +132,14 @@ function PredictionSection({ match }: { match: Match }) {
                     <span className="text-sm font-mono font-bold text-gray-900 shrink-0">
                       {(pred.model_probability * 100).toFixed(0)}%
                     </span>
-                    <span className="text-xs text-gray-400 shrink-0">modelo</span>
+                    <span className="text-xs text-gray-400 shrink-0">model</span>
                     {marketPct && (
                       <>
                         <span className="text-gray-300 text-xs shrink-0">·</span>
                         <span className="text-sm font-mono text-gray-500 shrink-0">
                           {marketPct}%
                         </span>
-                        <span className="text-xs text-gray-400 shrink-0">mercado</span>
+                        <span className="text-xs text-gray-400 shrink-0">market</span>
                       </>
                     )}
                     {pred.market_odds != null ? (
@@ -167,7 +167,7 @@ function PredictionSection({ match }: { match: Match }) {
                       </span>
                       <span className="text-green-300">·</span>
                       <span className="text-green-600">
-                        potencial:{" "}
+                        potential:{" "}
                         <span className="font-mono font-semibold">
                           +{(bet.stake_amount * (bet.decimal_odds - 1)).toFixed(2)}€
                         </span>
@@ -195,7 +195,7 @@ function MatchRow({
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const time = new Date(match.match_date).toLocaleTimeString("es-ES", {
+  const time = new Date(match.match_date).toLocaleTimeString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -229,12 +229,12 @@ function MatchRow({
         <span className="w-5 shrink-0 text-center">
           {hasBet ? (
             <span
-              title="Apuesta activa"
+              title="Active bet"
               className="inline-block w-2 h-2 rounded-full bg-green-500"
             />
           ) : hasEdge ? (
             <span
-              title="Ventaja detectada"
+              title="Edge detected"
               className="inline-block w-2 h-2 rounded-full bg-gray-300"
             />
           ) : null}
@@ -251,7 +251,7 @@ function MatchRow({
         <span className="shrink-0 w-20 text-right">
           {isLive ? (
             <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-medium animate-pulse">
-              EN DIRECTO
+              LIVE
             </span>
           ) : (
             <span className="text-sm text-gray-400 font-mono">{time}</span>
@@ -278,7 +278,7 @@ function MatchRow({
 function DayHeader({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-3 py-1">
-      <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest capitalize font-mono">
+      <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest font-mono">
         {label}
       </span>
       <div className="flex-1 h-px bg-gray-100" />
@@ -314,13 +314,13 @@ export default function Upcoming() {
         ← Club Kelly
       </Link>
 
-      <h1 className="text-3xl font-black tracking-tight mb-2">Próximos partidos</h1>
+      <h1 className="text-3xl font-black tracking-tight mb-2">Upcoming matches</h1>
       <div className="flex items-center gap-3 text-sm text-gray-400 mb-10 font-mono">
-        <span>{matches.length} partidos</span>
+        <span>{matches.length} matches</span>
         {betCount > 0 && (
           <>
             <span className="text-gray-200">·</span>
-            <span className="text-green-600">{betCount} con apuesta</span>
+            <span className="text-green-600">{betCount} with active bet</span>
           </>
         )}
       </div>
@@ -328,14 +328,17 @@ export default function Upcoming() {
       {loading ? (
         <div className="space-y-2">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-12 bg-gray-50 rounded-lg animate-pulse border border-gray-100" />
+            <div
+              key={i}
+              className="h-12 bg-gray-50 rounded-lg animate-pulse border border-gray-100"
+            />
           ))}
         </div>
       ) : error ? (
         <p className="text-red-500 text-sm">{error.message}</p>
       ) : matches.length === 0 ? (
         <p className="text-gray-400 text-sm text-center py-12">
-          No hay partidos próximos disponibles.
+          No upcoming matches available.
         </p>
       ) : (
         <div className="space-y-5">

@@ -9,10 +9,10 @@ function fmt(n: number) {
 }
 
 const EVENT_LABELS: Record<string, string> = {
-  initial: "Inicial",
-  bet_placed: "Apuesta",
-  bet_resolved: "Resultado",
-  adjustment: "Ajuste",
+  initial: "Initial",
+  bet_placed: "Bet",
+  bet_resolved: "Result",
+  adjustment: "Adjustment",
 };
 
 // ── Open-bet table ─────────────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ function OpenBetsPanel({
   const [message, setMessage] = useState<string | null>(null);
 
   async function handleVoid(bet: AdminBet) {
-    if (!confirm(`¿Anular apuesta #${bet.id} (${bet.home_team} vs ${bet.away_team})?`)) return;
+    if (!confirm(`Void bet #${bet.id} (${bet.home_team} vs ${bet.away_team})?`)) return;
     setVoiding(bet.id);
     setMessage(null);
     try {
@@ -47,7 +47,7 @@ function OpenBetsPanel({
   return (
     <section>
       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest font-mono mb-4">
-        Apuestas abiertas ({bets.length})
+        Open bets ({bets.length})
       </h2>
 
       {message && (
@@ -59,11 +59,14 @@ function OpenBetsPanel({
       {loading ? (
         <div className="space-y-2">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-12 bg-gray-50 rounded-lg animate-pulse border border-gray-100" />
+            <div
+              key={i}
+              className="h-12 bg-gray-50 rounded-lg animate-pulse border border-gray-100"
+            />
           ))}
         </div>
       ) : bets.length === 0 ? (
-        <p className="text-gray-400 text-sm py-4">Sin apuestas abiertas</p>
+        <p className="text-gray-400 text-sm py-4">No open bets.</p>
       ) : (
         <div className="space-y-2">
           {bets.map((b) => (
@@ -90,7 +93,7 @@ function OpenBetsPanel({
                 disabled={voiding === b.id}
                 className="shrink-0 text-xs px-3 py-1.5 rounded border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-40 transition"
               >
-                {voiding === b.id ? "Anulando…" : "Anular"}
+                {voiding === b.id ? "Voiding…" : "Void"}
               </button>
             </div>
           ))}
@@ -112,16 +115,18 @@ function AdjustPanel({ onRefresh }: { onRefresh: () => void }) {
     e.preventDefault();
     const parsed = parseFloat(amount);
     if (isNaN(parsed) || parsed === 0) {
-      setMessage("Introduce un importe válido (positivo o negativo)");
+      setMessage("Enter a valid amount (positive or negative).");
       return;
     }
-    if (!confirm(`¿Ajustar bankroll ${parsed >= 0 ? "+" : ""}${parsed.toFixed(2)}€?`)) return;
+    if (!confirm(`Adjust bankroll ${parsed >= 0 ? "+" : ""}${parsed.toFixed(2)}€?`)) return;
 
     setLoading(true);
     setMessage(null);
     try {
       const r = await api.adminAdjustBankroll(parsed, note.trim());
-      setMessage(`Ajuste aplicado. ${r.balance_before.toFixed(2)}€ → ${r.balance_after.toFixed(2)}€`);
+      setMessage(
+        `Adjustment applied. ${r.balance_before.toFixed(2)}€ → ${r.balance_after.toFixed(2)}€`
+      );
       setAmount("");
       setNote("");
       onRefresh();
@@ -135,30 +140,33 @@ function AdjustPanel({ onRefresh }: { onRefresh: () => void }) {
   return (
     <section>
       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest font-mono mb-4">
-        Ajuste manual de bankroll
+        Manual bankroll adjustment
       </h2>
 
-      <form onSubmit={handleSubmit} className="border border-gray-100 rounded-xl p-5 space-y-3 max-w-md">
+      <form
+        onSubmit={handleSubmit}
+        className="border border-gray-100 rounded-xl p-5 space-y-3 max-w-md"
+      >
         <div>
           <label className="text-xs text-gray-400 block mb-1">
-            Importe (€) — positivo para añadir, negativo para restar
+            Amount (€) — positive to add, negative to subtract
           </label>
           <input
             type="number"
             step="0.01"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder="+500.00 ó -200.00"
+            placeholder="+500.00 or -200.00"
             className="w-full border border-gray-200 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-gray-900 transition-colors"
           />
         </div>
         <div>
-          <label className="text-xs text-gray-400 block mb-1">Nota (opcional)</label>
+          <label className="text-xs text-gray-400 block mb-1">Note (optional)</label>
           <input
             type="text"
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Motivo del ajuste"
+            placeholder="Reason for adjustment"
             className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900 transition-colors"
           />
         </div>
@@ -167,11 +175,9 @@ function AdjustPanel({ onRefresh }: { onRefresh: () => void }) {
           disabled={loading}
           className="text-sm px-4 py-2 rounded bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-40 transition font-medium"
         >
-          {loading ? "Aplicando…" : "Aplicar ajuste"}
+          {loading ? "Applying…" : "Apply adjustment"}
         </button>
-        {message && (
-          <p className="text-sm text-gray-600 pt-1">{message}</p>
-        )}
+        {message && <p className="text-sm text-gray-600 pt-1">{message}</p>}
       </form>
     </section>
   );
@@ -179,11 +185,17 @@ function AdjustPanel({ onRefresh }: { onRefresh: () => void }) {
 
 // ── Activity log ───────────────────────────────────────────────────────────────
 
-function ActivityPanel({ events, loading }: { events: ActivityEvent[]; loading: boolean }) {
+function ActivityPanel({
+  events,
+  loading,
+}: {
+  events: ActivityEvent[];
+  loading: boolean;
+}) {
   return (
     <section>
       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest font-mono mb-4">
-        Log de actividad ({events.length} eventos)
+        Activity log ({events.length} events)
       </h2>
 
       {loading ? (
@@ -193,17 +205,17 @@ function ActivityPanel({ events, loading }: { events: ActivityEvent[]; loading: 
           ))}
         </div>
       ) : events.length === 0 ? (
-        <p className="text-gray-400 text-sm py-4">Sin actividad registrada</p>
+        <p className="text-gray-400 text-sm py-4">No activity recorded.</p>
       ) : (
         <div className="border border-gray-100 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-400 uppercase border-b border-gray-100 font-mono">
-                <th className="text-left px-4 py-2">Tipo</th>
-                <th className="text-right px-4 py-2">Cambio</th>
-                <th className="text-right px-4 py-2">Saldo</th>
-                <th className="text-left px-4 py-2 hidden sm:table-cell">Nota</th>
-                <th className="text-right px-4 py-2 hidden md:table-cell">Fecha</th>
+                <th className="text-left px-4 py-2">Type</th>
+                <th className="text-right px-4 py-2">Change</th>
+                <th className="text-right px-4 py-2">Balance</th>
+                <th className="text-left px-4 py-2 hidden sm:table-cell">Note</th>
+                <th className="text-right px-4 py-2 hidden md:table-cell">Date</th>
               </tr>
             </thead>
             <tbody>
@@ -229,7 +241,9 @@ function ActivityPanel({ events, loading }: { events: ActivityEvent[]; loading: 
                     {e.note ?? "—"}
                   </td>
                   <td className="px-4 py-2 text-right text-xs text-gray-400 hidden md:table-cell whitespace-nowrap">
-                    {e.created_at ? new Date(e.created_at).toLocaleString("es-ES") : "—"}
+                    {e.created_at
+                      ? new Date(e.created_at).toLocaleString("en-GB")
+                      : "—"}
                   </td>
                 </tr>
               ))}
@@ -276,7 +290,7 @@ export default function Admin() {
           onClick={refreshAll}
           className="text-xs text-gray-400 hover:text-gray-900 transition-colors px-3 py-1.5 border border-gray-200 rounded hover:border-gray-400"
         >
-          Actualizar
+          Refresh
         </button>
       </div>
 
