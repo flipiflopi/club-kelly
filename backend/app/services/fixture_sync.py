@@ -262,7 +262,12 @@ def _load_config(slug: str) -> dict:
 def _build_fixture_source(config: dict):
     """Instantiate the right fixture adapter based on competition config."""
     source_name: str = config["data"]["fixture_source"]
+    sport_key: str = config["data"].get("odds_sport_key", "soccer_fifa_world_cup")
     settings = get_settings()
+
+    if source_name == "OddsApiFixtureSource":
+        from adapters.fixtures.odds_api_fixture import OddsApiFixtureSource
+        return OddsApiFixtureSource(api_key=settings.the_odds_api_key, sport_key=sport_key)
 
     if source_name == "WorldCup2026FixtureSource":
         from adapters.fixtures.worldcup2026 import WorldCup2026FixtureSource

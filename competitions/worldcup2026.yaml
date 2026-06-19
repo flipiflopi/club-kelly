@@ -21,7 +21,7 @@ risk:
   max_odds: 6.00             # ignore long shots (model uncertainty too high)
 
 data:
-  fixture_source: WorldCup2026FixtureSource
+  fixture_source: OddsApiFixtureSource
   odds_source: TheOddsApiSource
   odds_sport_key: soccer_fifa_world_cup
   historical_source: KaggleInternationalSource
