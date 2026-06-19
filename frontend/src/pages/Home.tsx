@@ -124,6 +124,46 @@ export default function Home() {
 
       <div className="border-t border-gray-100" />
 
+      {/* Live stats strip */}
+      <section className="max-w-2xl mx-auto px-6 py-10">
+        {snapshot ? (
+          <div className="rounded-xl border border-gray-200 bg-gray-50/60 px-6 py-5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-gray-200 gap-y-5 sm:gap-y-0">
+              <div className="sm:pr-6">
+                <p className="text-xs text-gray-400 uppercase tracking-widest font-mono">Bankroll</p>
+                <p className="text-2xl font-black font-mono mt-1 text-gray-900">
+                  {snapshot.current_balance.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}€
+                </p>
+              </div>
+              <div className="sm:px-6">
+                <p className="text-xs text-gray-400 uppercase tracking-widest font-mono">ROI</p>
+                <p className={`text-2xl font-black font-mono mt-1 ${snapshot.roi_pct >= 0 ? "text-green-600" : "text-red-500"}`}>
+                  {snapshot.roi_pct >= 0 ? "+" : ""}{snapshot.roi_pct.toFixed(1)}%
+                </p>
+              </div>
+              <div className="sm:px-6">
+                <p className="text-xs text-gray-400 uppercase tracking-widest font-mono">P&amp;L</p>
+                <p className={`text-2xl font-black font-mono mt-1 ${snapshot.total_profit_loss >= 0 ? "text-green-600" : "text-red-500"}`}>
+                  {snapshot.total_profit_loss >= 0 ? "+" : ""}{snapshot.total_profit_loss.toFixed(0)}€
+                </p>
+              </div>
+              <div className="sm:pl-6">
+                <p className="text-xs text-gray-400 uppercase tracking-widest font-mono">Record</p>
+                <p className="text-2xl font-black font-mono mt-1 text-gray-900">
+                  {snapshot.won}<span className="text-gray-300 font-normal">W</span>{" "}
+                  <span className="text-gray-300 text-lg font-normal">·</span>{" "}
+                  {snapshot.lost}<span className="text-gray-300 font-normal">L</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-gray-100 bg-gray-50/60 h-20 animate-pulse" />
+        )}
+      </section>
+
+      <div className="border-t border-gray-100" />
+
       {/* Nav cards */}
       <section className="max-w-2xl mx-auto px-6 py-16">
         <p className="text-xs text-gray-300 uppercase tracking-widest font-mono mb-8">
