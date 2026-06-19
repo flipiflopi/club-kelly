@@ -46,7 +46,7 @@ from engine.models.dixon_coles import DixonColesModel, DixonColesParams
 
 logger = logging.getLogger(__name__)
 
-COMPETITIONS_DIR = Path(__file__).parents[4] / "competitions"
+COMPETITIONS_DIR = Path(__file__).parents[3] / "competitions"
 MODEL_VERSION = "ensemble_v1"
 
 
