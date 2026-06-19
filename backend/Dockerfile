@@ -19,4 +19,12 @@ COPY engine/ engine/
 COPY adapters/ adapters/
 COPY competitions/ competitions/
 
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Copy alembic config + migrations
+COPY alembic.ini .
+COPY migrations/ migrations/
+
+# Entrypoint: runs migrations then starts the app
+COPY backend/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

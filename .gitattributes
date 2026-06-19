@@ -1,0 +1,13 @@
+# Normalize line endings in the repo
+* text=auto
+
+# Shell scripts must always have LF (they run on Linux)
+*.sh text eol=lf
+
+# Python/config files — auto is fine
+*.py text=auto
+*.yml text=auto
+*.yaml text=auto
+*.toml text=auto
+*.ini text=auto
+*.md text=auto
