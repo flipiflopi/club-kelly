@@ -40,7 +40,7 @@ from backend.app.models.prediction import Prediction
 from backend.app.models.simulated_bet import BetStatus, SimulatedBet
 from engine.decision.edge import evaluate_outcome, remove_vig
 from engine.decision.kelly import kelly_fraction
-from engine.decision.risk_filters import RiskConfig, apply_risk_filters, correlated_exposure
+from engine.decision.risk_filters import RiskConfig, apply_risk_filters, correlated_exposure, model_deviation_too_high
 from engine.markets import market_registry
 from engine.models.dixon_coles import DixonColesModel, DixonColesParams
 
@@ -162,6 +162,7 @@ def _run_for_competition(
         max_daily_exposure_pct=config["risk"]["max_daily_exposure_pct"],
         min_odds=config["risk"]["min_odds"],
         max_odds=config["risk"]["max_odds"],
+        max_model_overestimate_ratio=config["risk"].get("max_model_overestimate_ratio", 2.0),
     )
     min_edge: float = config["edge"]["min_edge"]
     kelly_multiplier: float = config["kelly"]["multiplier"]
@@ -280,6 +281,21 @@ def _process_match(
 
             # Layers 3-4: sizing and risk — only if edge passes Layer 2
             if decimal_odds is None or not eval_result.get("has_value"):
+                continue
+
+            # Sanity check: block bets where model deviates too far from market.
+            # A ratio > max_model_overestimate_ratio almost certainly means our
+            # moment-matching model is wrong, not that we found a huge inefficiency.
+            fair_prob = eval_result.get("fair_prob")
+            if fair_prob and model_deviation_too_high(
+                model_prob, fair_prob, risk_cfg.max_model_overestimate_ratio
+            ):
+                logger.info(
+                    "Match %d %s/%s: model/market ratio %.1fx > %.1fx — skipping (model likely wrong)",
+                    match.id, market_slug, outcome,
+                    model_prob / fair_prob,
+                    risk_cfg.max_model_overestimate_ratio,
+                )
                 continue
 
             k_frac = kelly_fraction(

@@ -14,14 +14,16 @@ class RejectionReason(str, Enum):
     ODDS_TOO_HIGH = "odds_too_high"
     DAILY_EXPOSURE_LIMIT = "daily_exposure_limit"
     ZERO_STAKE = "zero_stake"
+    MODEL_MARKET_DEVIATION = "model_market_deviation"
 
 
 @dataclass(frozen=True)
 class RiskConfig:
-    max_bet_pct: float = 0.05       # max 5% of bankroll per bet
+    max_bet_pct: float = 0.03       # max 3% of bankroll per bet
     max_daily_exposure_pct: float = 0.15  # max 15% of bankroll open at once
     min_odds: float = 1.30
-    max_odds: float = 6.00
+    max_odds: float = 5.00
+    max_model_overestimate_ratio: float = 2.0  # block if model > 2x market consensus
 
 
 @dataclass
@@ -121,6 +123,29 @@ def apply_risk_filters(
         final_stake_pct=capped_pct,
         final_stake_eur=capped_eur,
     )
+
+
+def model_deviation_too_high(
+    model_prob: float,
+    fair_market_prob: float,
+    max_ratio: float,
+) -> bool:
+    """
+    True when the model is more than max_ratio times more confident than the market.
+
+    A ratio > 2x almost always indicates a model error rather than a genuine
+    inefficiency, especially in liquid markets like the World Cup. The market
+    aggregates information from thousands of bettors; a simple moment-matching
+    model is unlikely to be that much smarter.
+
+    Example that would be blocked (ratio 2.3x):
+      model_prob=0.39, fair_market_prob=0.17, max_ratio=2.0 → True
+    Example that would be allowed (ratio 1.2x):
+      model_prob=0.47, fair_market_prob=0.40, max_ratio=2.0 → False
+    """
+    if fair_market_prob <= 0 or max_ratio <= 0:
+        return False
+    return (model_prob / fair_market_prob) > max_ratio
 
 
 def correlated_exposure(stakes_eur: list[float]) -> float:
