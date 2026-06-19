@@ -21,6 +21,7 @@ export interface Prediction {
 
 export interface Bet {
   id: number;
+  match_id: number;
   status: BetStatus;
   stake_amount: number;
   stake_pct: number;
@@ -29,6 +30,8 @@ export interface Bet {
   profit_loss: number | null;
   outcome: string;
   market_slug: string;
+  home_team_name: string;
+  away_team_name: string;
   bankroll_after: number | null;
   kelly_fraction: number;
   reasoning_text: string | null;

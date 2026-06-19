@@ -55,5 +55,13 @@ class SimulatedBet(Base, TimestampMixin):
     def market_slug(self) -> str:
         return self.prediction.market_slug if self.prediction else ""
 
+    @property
+    def home_team_name(self) -> str:
+        return self.match.home_team.name if self.match and self.match.home_team else ""
+
+    @property
+    def away_team_name(self) -> str:
+        return self.match.away_team.name if self.match and self.match.away_team else ""
+
     def __repr__(self) -> str:
         return f"<SimulatedBet id={self.id} {self.status} stake={self.stake_amount:.2f}€>"

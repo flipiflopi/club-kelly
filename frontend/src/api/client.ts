@@ -17,6 +17,9 @@ export const api = {
   getPastMatches: (offset = 0, limit = 50) =>
     get<Match[]>(`/v1/matches/past?offset=${offset}&limit=${limit}`),
 
+  getAllBets: (status?: string, limit = 100) =>
+    get<Bet[]>(`/v1/bets/${status ? `?status=${status}&limit=${limit}` : `?limit=${limit}`}`),
+
   getOpenBets: () => get<Bet[]>("/v1/bets/open"),
 
   getBankrollSnapshot: () => get<BankrollSnapshot>("/v1/bankroll/snapshot"),

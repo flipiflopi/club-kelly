@@ -20,11 +20,12 @@ class BetBrief(BaseModel):
 
 
 class BetDetail(BetBrief):
-    stake_pct: float
-    bankroll_before: float
-    bankroll_after: float | None = None
+    match_id: int
+    home_team_name: str = ""   # from simulated_bet.home_team_name property
+    away_team_name: str = ""   # from simulated_bet.away_team_name property
     kelly_fraction: float
     reasoning_text: str | None = None
+    bankroll_after: float | None = None
     resolved_at: datetime | None = None
     created_at: datetime
 
