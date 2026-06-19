@@ -7,7 +7,9 @@
       "Bash(git push *)",
       "Bash(git pull *)",
       "Bash(git stash *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(uv run *)",
+      "PowerShell(cd \"c:\\\\GitHub Clones\\\\Predicci-n-Futbol\"; $env:PYTHONPATH = \".\"; python -m backend.app.commands.backtest --wc-years 2018,2022 2>&1)"
     ]
   }
 }
