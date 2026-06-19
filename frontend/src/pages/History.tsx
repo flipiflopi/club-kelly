@@ -1,9 +1,10 @@
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { usePolling } from "../api/usePolling";
 import type { Bet, BankrollEvent, BankrollSnapshot } from "../types/api";
 
 const MARKET_NAMES: Record<string, string> = {
-  match_result: "Resultado 1X2",
+  match_result: "1X2",
   over_under: "Más/Menos",
   btts: "Ambos marcan",
 };
@@ -22,7 +23,7 @@ function outcomeLabel(outcome: string, home: string, away: string): string {
   return OUTCOME_LABELS[outcome] ?? outcome;
 }
 
-// ── Bankroll chart (pure SVG, no dependencies) ────────────────────────────────
+// ── Bankroll chart ────────────────────────────────────────────────────────────
 
 function BankrollChart({
   events,
@@ -33,7 +34,7 @@ function BankrollChart({
 }) {
   if (events.length === 0) {
     return (
-      <div className="h-32 flex items-center justify-center text-gray-600 text-sm">
+      <div className="h-32 flex items-center justify-center text-gray-300 text-sm">
         Sin movimientos registrados todavía
       </div>
     );
@@ -61,9 +62,8 @@ function BankrollChart({
   const lastY = sy(values[values.length - 1]);
   const baseY = sy(initial);
   const isUp = values[values.length - 1] >= initial;
-  const color = isUp ? "#22c55e" : "#ef4444";
+  const color = isUp ? "#16a34a" : "#ef4444";
 
-  // Filled area under line
   const areaPoints = [
     `${sx(0).toFixed(1)},${(H - PY).toFixed(1)}`,
     ...pts,
@@ -74,26 +74,20 @@ function BankrollChart({
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-36">
       <defs>
         <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.12" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.01" />
         </linearGradient>
       </defs>
-
-      {/* Filled area */}
       <polygon points={areaPoints} fill="url(#bg)" />
-
-      {/* Baseline at initial bankroll */}
       <line
         x1={PX}
         y1={baseY}
         x2={W - PX}
         y2={baseY}
-        stroke="#4b5563"
+        stroke="#e5e7eb"
         strokeWidth="1"
         strokeDasharray="5 3"
       />
-
-      {/* Line chart */}
       <polyline
         points={polyline}
         fill="none"
@@ -102,31 +96,21 @@ function BankrollChart({
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-
-      {/* End dot */}
       <circle cx={lastX} cy={lastY} r="4" fill={color} />
-
-      {/* Y labels */}
-      <text x={W - PX - 2} y={PY + 4} textAnchor="end" fill="#6b7280" fontSize="10">
+      <text x={W - PX - 2} y={PY + 4} textAnchor="end" fill="#9ca3af" fontSize="10">
         {maxV.toFixed(0)}€
       </text>
-      <text
-        x={PX + 2}
-        y={baseY - 4}
-        textAnchor="start"
-        fill="#6b7280"
-        fontSize="9"
-      >
+      <text x={PX + 2} y={baseY - 4} textAnchor="start" fill="#9ca3af" fontSize="9">
         Inicial {initial.toFixed(0)}€
       </text>
-      <text x={W - PX - 2} y={H - PY - 2} textAnchor="end" fill="#6b7280" fontSize="10">
+      <text x={W - PX - 2} y={H - PY - 2} textAnchor="end" fill="#9ca3af" fontSize="10">
         {minV.toFixed(0)}€
       </text>
     </svg>
   );
 }
 
-// ── Stats cards ───────────────────────────────────────────────────────────────
+// ── Stat card ─────────────────────────────────────────────────────────────────
 
 function StatCard({
   label,
@@ -140,20 +124,20 @@ function StatCard({
   positive?: boolean;
 }) {
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-      <p className="text-xs text-gray-500 mb-1 uppercase tracking-wider">{label}</p>
+    <div className="border-t-2 border-gray-100 pt-4">
+      <p className="text-xs text-gray-400 uppercase tracking-widest font-mono mb-2">{label}</p>
       <p
-        className={`text-2xl font-bold ${
+        className={`text-2xl font-black font-mono ${
           positive === true
-            ? "text-green-400"
+            ? "text-green-600"
             : positive === false
-            ? "text-red-400"
-            : "text-white"
+            ? "text-red-500"
+            : "text-gray-900"
         }`}
       >
         {value}
       </p>
-      {sub && <p className="text-xs text-gray-600 mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-gray-400 mt-1 font-mono">{sub}</p>}
     </div>
   );
 }
@@ -162,10 +146,10 @@ function StatCard({
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    open: "bg-blue-900/60 text-blue-300 border border-blue-800",
-    won: "bg-green-900/60 text-green-300 border border-green-800",
-    lost: "bg-red-900/60 text-red-300 border border-red-800",
-    void: "bg-gray-800 text-gray-400 border border-gray-700",
+    open: "bg-blue-50 text-blue-600 border border-blue-200",
+    won: "bg-green-50 text-green-700 border border-green-200",
+    lost: "bg-red-50 text-red-600 border border-red-200",
+    void: "bg-gray-50 text-gray-400 border border-gray-200",
   };
   const labels: Record<string, string> = {
     open: "Abierta",
@@ -195,46 +179,41 @@ function BetRow({ bet }: { bet: Bet }) {
   const plPositive = pl != null ? pl >= 0 : undefined;
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-      {/* Match + outcome */}
+    <div className="border border-gray-100 rounded-lg px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 hover:border-gray-200 transition-colors">
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold truncate">
+        <div className="text-sm font-semibold text-gray-900 truncate">
           {bet.home_team_name} vs {bet.away_team_name}
         </div>
         <div className="text-xs text-gray-400 mt-0.5">
-          {market} · <span className="text-white">{label}</span>
+          {market} · <span className="text-gray-900 font-medium">{label}</span>
         </div>
       </div>
 
-      {/* Odds */}
       <div className="shrink-0 text-right">
-        <div className="text-sm font-mono text-gray-300">@{bet.decimal_odds.toFixed(2)}</div>
-        <div className="text-xs text-gray-600">cuota</div>
+        <div className="text-sm font-mono text-gray-600">@{bet.decimal_odds.toFixed(2)}</div>
+        <div className="text-xs text-gray-400">cuota</div>
       </div>
 
-      {/* Stake */}
       <div className="shrink-0 text-right">
-        <div className="text-sm font-mono text-white">{bet.stake_amount.toFixed(2)}€</div>
-        <div className="text-xs text-gray-600">{(bet.stake_pct * 100).toFixed(1)}% bankroll</div>
+        <div className="text-sm font-mono font-semibold text-gray-900">{bet.stake_amount.toFixed(2)}€</div>
+        <div className="text-xs text-gray-400">{(bet.stake_pct * 100).toFixed(1)}% bankroll</div>
       </div>
 
-      {/* P&L */}
       <div className="shrink-0 text-right w-28">
         <div
-          className={`text-sm font-mono font-semibold ${
+          className={`text-sm font-mono font-bold ${
             plPositive === true
-              ? "text-green-400"
+              ? "text-green-600"
               : plPositive === false
-              ? "text-red-400"
-              : "text-gray-500"
+              ? "text-red-500"
+              : "text-gray-400"
           }`}
         >
           {plStr}
         </div>
-        <div className="text-xs text-gray-600">resultado</div>
+        <div className="text-xs text-gray-400">resultado</div>
       </div>
 
-      {/* Status */}
       <div className="shrink-0">
         <StatusBadge status={bet.status} />
       </div>
@@ -259,21 +238,28 @@ export default function History() {
   );
 
   const loading = snapLoading || chartLoading || betsLoading;
-
   const openBets = bets?.filter((b) => b.status === "open") ?? [];
   const resolvedBets = bets?.filter((b) => b.status !== "open") ?? [];
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-bold">Historial y rendimiento</h1>
+    <div className="max-w-2xl mx-auto px-6 py-12">
+      <Link
+        to="/"
+        className="text-xs text-gray-400 hover:text-gray-900 transition-colors flex items-center gap-1 mb-8"
+      >
+        ← Club Kelly
+      </Link>
 
-      {/* Stats row */}
+      <h1 className="text-3xl font-black tracking-tight mb-2">Historial</h1>
+      <p className="text-sm text-gray-400 mb-10">Rendimiento acumulado y todas las apuestas.</p>
+
+      {/* Stats */}
       {!snapLoading && snapshot ? (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-10">
           <StatCard
-            label="Bankroll actual"
-            value={`${snapshot.current_balance.toFixed(2)}€`}
-            sub={`Inicial: ${snapshot.initial_balance.toFixed(2)}€`}
+            label="Bankroll"
+            value={`${snapshot.current_balance.toFixed(0)}€`}
+            sub={`Inicial: ${snapshot.initial_balance.toFixed(0)}€`}
           />
           <StatCard
             label="ROI"
@@ -288,30 +274,34 @@ export default function History() {
                 ? `${((snapshot.won / snapshot.total_bets) * 100).toFixed(0)}%`
                 : "—"
             }
-            sub={`${snapshot.won}G / ${snapshot.lost}P de ${snapshot.total_bets} resueltas`}
+            sub={`${snapshot.won}G / ${snapshot.lost}P de ${snapshot.total_bets}`}
             positive={snapshot.won > snapshot.lost}
           />
           <StatCard
-            label="Apuestas abiertas"
+            label="Abiertas"
             value={String(openBets.length)}
             sub={
               openBets.length > 0
-                ? `${openBets.reduce((s, b) => s + b.stake_amount, 0).toFixed(2)}€ en juego`
+                ? `${openBets.reduce((s, b) => s + b.stake_amount, 0).toFixed(0)}€ en juego`
                 : "Sin exposición"
             }
           />
         </div>
       ) : (
-        <div className="h-24 bg-gray-900 rounded-xl animate-pulse" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-10">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="border-t-2 border-gray-100 pt-4 h-20 animate-pulse" />
+          ))}
+        </div>
       )}
 
-      {/* Bankroll chart */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <p className="text-sm text-gray-500 mb-3 uppercase tracking-wider text-xs">
+      {/* Chart */}
+      <div className="border border-gray-100 rounded-xl p-5 mb-10">
+        <p className="text-xs text-gray-400 uppercase tracking-widest font-mono mb-4">
           Evolución del bankroll
         </p>
         {chartLoading ? (
-          <div className="h-36 animate-pulse bg-gray-800 rounded" />
+          <div className="h-36 animate-pulse bg-gray-50 rounded" />
         ) : (
           <BankrollChart
             events={chartData ?? []}
@@ -320,23 +310,23 @@ export default function History() {
         )}
       </div>
 
-      {/* Bets table */}
+      {/* Bets */}
       {loading ? (
         <div className="space-y-2">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-16 bg-gray-900 rounded-lg animate-pulse" />
+            <div key={i} className="h-16 bg-gray-50 rounded-lg animate-pulse" />
           ))}
         </div>
       ) : !bets || bets.length === 0 ? (
-        <p className="text-gray-500 text-sm text-center py-8">
+        <p className="text-gray-400 text-sm text-center py-8">
           Sin apuestas registradas todavía
         </p>
       ) : (
         <div className="space-y-5">
           {openBets.length > 0 && (
             <section>
-              <h2 className="text-xs font-medium text-blue-400 uppercase tracking-wider mb-2">
-                Apuestas abiertas ({openBets.length})
+              <h2 className="text-xs font-semibold text-blue-600 uppercase tracking-widest font-mono mb-3">
+                Abiertas ({openBets.length})
               </h2>
               <div className="space-y-2">
                 {openBets.map((b) => (
@@ -348,8 +338,8 @@ export default function History() {
 
           {resolvedBets.length > 0 && (
             <section>
-              <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-                Historial resuelto ({resolvedBets.length})
+              <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest font-mono mb-3">
+                Resueltas ({resolvedBets.length})
               </h2>
               <div className="space-y-2">
                 {resolvedBets.map((b) => (

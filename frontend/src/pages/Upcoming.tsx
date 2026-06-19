@@ -1,12 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { usePolling } from "../api/usePolling";
 import type { Bet, Match, Prediction } from "../types/api";
-
-// ── Constants ────────────────────────────────────────────────────────────────
-
-const APP_NAME = "Club Kelly";
-const APP_SLOGAN = "I don't guess. I calculate.";
 
 const MARKET_NAMES: Record<string, string> = {
   match_result: "Resultado 1X2",
@@ -56,18 +52,20 @@ function groupByDay(matches: Match[]): [string, Match[]][] {
   return Array.from(map.entries());
 }
 
-// ── Prediction details (shown when expanded) ──────────────────────────────────
+// ── Probability bar ───────────────────────────────────────────────────────────
 
 function ProbBar({ value, highlight }: { value: number; highlight: boolean }) {
   return (
-    <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden w-full">
+    <div className="h-1 bg-gray-100 rounded-full overflow-hidden w-full">
       <div
-        className={`h-full rounded-full ${highlight ? "bg-green-500" : "bg-blue-500"}`}
+        className={`h-full rounded-full ${highlight ? "bg-green-500" : "bg-gray-300"}`}
         style={{ width: `${Math.min(value * 100, 100)}%` }}
       />
     </div>
   );
 }
+
+// ── Prediction section ────────────────────────────────────────────────────────
 
 function PredictionSection({ match }: { match: Match }) {
   const byMarket = new Map<string, Prediction[]>();
@@ -78,8 +76,7 @@ function PredictionSection({ match }: { match: Match }) {
   }
   for (const list of byMarket.values()) {
     list.sort(
-      (a, b) =>
-        (OUTCOME_ORDER[a.outcome] ?? 99) - (OUTCOME_ORDER[b.outcome] ?? 99)
+      (a, b) => (OUTCOME_ORDER[a.outcome] ?? 99) - (OUTCOME_ORDER[b.outcome] ?? 99)
     );
   }
 
@@ -90,20 +87,20 @@ function PredictionSection({ match }: { match: Match }) {
 
   if (byMarket.size === 0) {
     return (
-      <p className="text-xs text-gray-600 py-2 text-center">
+      <p className="text-xs text-gray-400 py-3 text-center">
         Sin predicciones disponibles aún
       </p>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {Array.from(byMarket.entries()).map(([marketSlug, preds]) => (
         <div key={marketSlug}>
-          <p className="text-xs text-gray-600 uppercase tracking-wider mb-2">
+          <p className="text-xs text-gray-400 uppercase tracking-wider mb-2 font-mono">
             {MARKET_NAMES[marketSlug] ?? marketSlug}
           </p>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {preds.map((pred) => {
               const bet = betByPredKey.get(`${pred.market_slug}|${pred.outcome}`);
               const hasEdge = (pred.edge ?? 0) >= 0.03;
@@ -117,36 +114,36 @@ function PredictionSection({ match }: { match: Match }) {
               return (
                 <div
                   key={pred.id}
-                  className={`rounded-lg px-3 py-2 ${
+                  className={`rounded-lg px-3 py-2.5 border ${
                     bet
-                      ? "bg-green-950 border border-green-800/60"
+                      ? "bg-green-50 border-green-200"
                       : hasEdge
-                      ? "bg-green-950/20 border border-green-900/30"
-                      : "bg-gray-800/40"
+                      ? "bg-green-50/50 border-green-100"
+                      : "bg-gray-50 border-gray-100"
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="w-24 shrink-0 text-sm font-medium truncate">
+                    <span className="w-24 shrink-0 text-sm font-medium text-gray-900 truncate">
                       {outcomeLabel(pred.outcome, match)}
                     </span>
                     <div className="flex-1 min-w-0">
                       <ProbBar value={pred.model_probability} highlight={hasEdge} />
                     </div>
-                    <span className="text-sm font-mono font-semibold text-white shrink-0">
+                    <span className="text-sm font-mono font-bold text-gray-900 shrink-0">
                       {(pred.model_probability * 100).toFixed(0)}%
                     </span>
-                    <span className="text-xs text-gray-500 shrink-0">modelo</span>
+                    <span className="text-xs text-gray-400 shrink-0">modelo</span>
                     {marketPct && (
                       <>
-                        <span className="text-gray-700 text-xs shrink-0">·</span>
-                        <span className="text-sm font-mono text-gray-400 shrink-0">
+                        <span className="text-gray-300 text-xs shrink-0">·</span>
+                        <span className="text-sm font-mono text-gray-500 shrink-0">
                           {marketPct}%
                         </span>
-                        <span className="text-xs text-gray-600 shrink-0">mercado</span>
+                        <span className="text-xs text-gray-400 shrink-0">mercado</span>
                       </>
                     )}
                     {pred.market_odds != null ? (
-                      <span className="text-xs text-gray-500 font-mono shrink-0 w-11 text-right">
+                      <span className="text-xs text-gray-400 font-mono shrink-0 w-11 text-right">
                         @{pred.market_odds.toFixed(2)}
                       </span>
                     ) : (
@@ -154,25 +151,24 @@ function PredictionSection({ match }: { match: Match }) {
                     )}
                     <div className="w-14 shrink-0 text-right">
                       {hasEdge && (
-                        <span className="text-xs bg-green-800 text-green-300 px-1.5 py-0.5 rounded font-mono">
+                        <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-mono font-semibold">
                           +{((pred.edge ?? 0) * 100).toFixed(1)}%
                         </span>
                       )}
                     </div>
                   </div>
                   {bet && (
-                    <div className="mt-1.5 flex items-center gap-2 text-xs text-green-400 pl-1">
-                      <span>💰</span>
+                    <div className="mt-2 flex items-center gap-2 text-xs text-green-700 pl-1">
                       <span className="font-semibold font-mono">
                         {bet.stake_amount.toFixed(2)}€
                       </span>
-                      <span className="text-green-600">
+                      <span className="text-green-500">
                         ({(bet.stake_pct * 100).toFixed(1)}% bankroll)
                       </span>
-                      <span className="text-green-700">·</span>
+                      <span className="text-green-300">·</span>
                       <span className="text-green-600">
                         potencial:{" "}
-                        <span className="font-mono text-green-400">
+                        <span className="font-mono font-semibold">
                           +{(bet.stake_amount * (bet.decimal_odds - 1)).toFixed(2)}€
                         </span>
                       </span>
@@ -188,7 +184,7 @@ function PredictionSection({ match }: { match: Match }) {
   );
 }
 
-// ── Match row (collapsed + expanded) ─────────────────────────────────────────
+// ── Match row ─────────────────────────────────────────────────────────────────
 
 function MatchRow({
   match,
@@ -205,66 +201,56 @@ function MatchRow({
   });
 
   const hasBet = (match.bets ?? []).length > 0;
-  const hasEdge = (match.predictions ?? []).some(
-    (p) => (p.edge ?? 0) >= 0.03
-  );
+  const hasEdge = (match.predictions ?? []).some((p) => (p.edge ?? 0) >= 0.03);
   const isLive = match.status === "live";
 
   return (
     <div
       className={`rounded-lg border transition-colors ${
         expanded
-          ? "border-gray-700 bg-gray-900"
+          ? "border-gray-300 bg-white shadow-sm"
           : hasBet
-          ? "border-green-900/50 bg-gray-900/60 hover:bg-gray-900"
-          : "border-gray-800/50 bg-gray-900/40 hover:bg-gray-900/80"
+          ? "border-green-200 bg-green-50/30 hover:bg-white hover:shadow-sm"
+          : "border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm"
       }`}
     >
-      {/* Clickable header row */}
       <button
         onClick={onToggle}
         className="w-full flex items-center gap-3 px-4 py-3 text-left"
       >
-        {/* Chevron */}
         <span
-          className={`text-gray-500 text-lg leading-none transition-transform duration-150 ${
+          className={`text-gray-400 text-lg leading-none transition-transform duration-150 ${
             expanded ? "rotate-90" : ""
           }`}
         >
           ›
         </span>
 
-        {/* Bet / edge dot */}
         <span className="w-5 shrink-0 text-center">
           {hasBet ? (
-            <span title="Apuesta activa" className="text-sm">💰</span>
+            <span
+              title="Apuesta activa"
+              className="inline-block w-2 h-2 rounded-full bg-green-500"
+            />
           ) : hasEdge ? (
             <span
               title="Ventaja detectada"
-              className="inline-block w-2 h-2 rounded-full bg-green-500"
+              className="inline-block w-2 h-2 rounded-full bg-gray-300"
             />
           ) : null}
         </span>
 
-        {/* Home team */}
-        <span className="flex-1 font-medium truncate text-sm">
+        <span className="flex-1 font-medium truncate text-sm text-gray-900">
           {match.home_team.name}
         </span>
-
-        {/* Score / vs */}
-        <span className="shrink-0 text-xs text-gray-500 w-6 text-center">
-          vs
-        </span>
-
-        {/* Away team */}
-        <span className="flex-1 font-medium truncate text-sm text-right">
+        <span className="shrink-0 text-xs text-gray-300 w-6 text-center">vs</span>
+        <span className="flex-1 font-medium truncate text-sm text-right text-gray-900">
           {match.away_team.name}
         </span>
 
-        {/* Live badge or time */}
         <span className="shrink-0 w-20 text-right">
           {isLive ? (
-            <span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded-full font-medium animate-pulse">
+            <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-medium animate-pulse">
               EN DIRECTO
             </span>
           ) : (
@@ -273,11 +259,10 @@ function MatchRow({
         </span>
       </button>
 
-      {/* Expanded details */}
       {expanded && (
-        <div className="px-4 pb-4 pt-1 border-t border-gray-800">
+        <div className="px-4 pb-4 pt-1 border-t border-gray-100">
           {match.round && (
-            <p className="text-xs text-gray-600 uppercase tracking-wider mb-3">
+            <p className="text-xs text-gray-400 uppercase tracking-wider mb-3 font-mono">
               {match.round}
             </p>
           )}
@@ -288,41 +273,15 @@ function MatchRow({
   );
 }
 
-// ── Hero header ───────────────────────────────────────────────────────────────
-
-function Hero({
-  matchCount,
-  betCount,
-}: {
-  matchCount: number;
-  betCount: number;
-}) {
-  return (
-    <div className="mb-8">
-      <h1 className="text-3xl font-bold text-white tracking-tight">{APP_NAME}</h1>
-      <p className="text-gray-500 mt-1 text-sm">{APP_SLOGAN}</p>
-      <div className="flex items-center gap-4 mt-3 text-xs text-gray-600">
-        <span>{matchCount} partidos próximos</span>
-        {betCount > 0 && (
-          <>
-            <span>·</span>
-            <span className="text-green-600">{betCount} con apuesta activa</span>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Day section header ────────────────────────────────────────────────────────
+// ── Day header ────────────────────────────────────────────────────────────────
 
 function DayHeader({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-3 py-1">
-      <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest capitalize">
+      <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest capitalize font-mono">
         {label}
       </span>
-      <div className="flex-1 h-px bg-gray-800" />
+      <div className="flex-1 h-px bg-gray-100" />
     </div>
   );
 }
@@ -342,28 +301,40 @@ export default function Upcoming() {
     });
   }
 
-  if (loading)
-    return (
-      <div className="space-y-2 mt-8">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-12 bg-gray-900 rounded-lg animate-pulse" />
-        ))}
-      </div>
-    );
-
-  if (error)
-    return <p className="text-red-400 mt-8">Error: {error.message}</p>;
-
   const matches = data ?? [];
   const betCount = matches.filter((m) => (m.bets ?? []).length > 0).length;
   const groups = groupByDay(matches);
 
   return (
-    <div>
-      <Hero matchCount={matches.length} betCount={betCount} />
+    <div className="max-w-2xl mx-auto px-6 py-12">
+      <Link
+        to="/"
+        className="text-xs text-gray-400 hover:text-gray-900 transition-colors flex items-center gap-1 mb-8"
+      >
+        ← Club Kelly
+      </Link>
 
-      {matches.length === 0 ? (
-        <p className="text-gray-500 text-center py-12">
+      <h1 className="text-3xl font-black tracking-tight mb-2">Próximos partidos</h1>
+      <div className="flex items-center gap-3 text-sm text-gray-400 mb-10 font-mono">
+        <span>{matches.length} partidos</span>
+        {betCount > 0 && (
+          <>
+            <span className="text-gray-200">·</span>
+            <span className="text-green-600">{betCount} con apuesta</span>
+          </>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-12 bg-gray-50 rounded-lg animate-pulse border border-gray-100" />
+          ))}
+        </div>
+      ) : error ? (
+        <p className="text-red-500 text-sm">{error.message}</p>
+      ) : matches.length === 0 ? (
+        <p className="text-gray-400 text-sm text-center py-12">
           No hay partidos próximos disponibles.
         </p>
       ) : (

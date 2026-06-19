@@ -1,9 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { usePolling } from "../api/usePolling";
 import type { AdminBet, ActivityEvent } from "../api/client";
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmt(n: number) {
   return `${n >= 0 ? "+" : ""}${n.toFixed(2)}€`;
@@ -14,13 +13,6 @@ const EVENT_LABELS: Record<string, string> = {
   bet_placed: "Apuesta",
   bet_resolved: "Resultado",
   adjustment: "Ajuste",
-};
-
-const EVENT_COLORS: Record<string, string> = {
-  initial: "text-blue-300",
-  bet_placed: "text-gray-300",
-  bet_resolved: "text-white",
-  adjustment: "text-yellow-300",
 };
 
 // ── Open-bet table ─────────────────────────────────────────────────────────────
@@ -54,12 +46,12 @@ function OpenBetsPanel({
 
   return (
     <section>
-      <h2 className="text-xs font-medium text-blue-400 uppercase tracking-wider mb-3">
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest font-mono mb-4">
         Apuestas abiertas ({bets.length})
       </h2>
 
       {message && (
-        <div className="mb-3 text-sm px-3 py-2 rounded bg-gray-800 border border-gray-700">
+        <div className="mb-4 text-sm px-3 py-2 rounded border border-gray-200 text-gray-700 bg-gray-50">
           {message}
         </div>
       )}
@@ -67,36 +59,36 @@ function OpenBetsPanel({
       {loading ? (
         <div className="space-y-2">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-12 bg-gray-900 rounded-lg animate-pulse" />
+            <div key={i} className="h-12 bg-gray-50 rounded-lg animate-pulse border border-gray-100" />
           ))}
         </div>
       ) : bets.length === 0 ? (
-        <p className="text-gray-500 text-sm py-4">Sin apuestas abiertas</p>
+        <p className="text-gray-400 text-sm py-4">Sin apuestas abiertas</p>
       ) : (
         <div className="space-y-2">
           {bets.map((b) => (
             <div
               key={b.id}
-              className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
+              className="border border-gray-100 rounded-lg px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
             >
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold truncate">
+                <div className="text-sm font-semibold text-gray-900 truncate">
                   {b.home_team} vs {b.away_team}
                 </div>
                 <div className="text-xs text-gray-400 mt-0.5">
                   #{b.id} · {b.market} · {b.outcome} · @{b.decimal_odds.toFixed(2)}
                 </div>
               </div>
-              <div className="shrink-0 text-right text-sm font-mono">
+              <div className="shrink-0 text-right text-sm font-mono text-gray-900">
                 {b.stake_amount.toFixed(2)}€
-                <span className="text-gray-500 text-xs ml-1">
+                <span className="text-gray-400 text-xs ml-1">
                   ({(b.stake_pct * 100).toFixed(1)}%)
                 </span>
               </div>
               <button
                 onClick={() => handleVoid(b)}
                 disabled={voiding === b.id}
-                className="shrink-0 text-xs px-3 py-1.5 rounded border border-red-800 text-red-400 hover:bg-red-900/30 disabled:opacity-40 transition"
+                className="shrink-0 text-xs px-3 py-1.5 rounded border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-40 transition"
               >
                 {voiding === b.id ? "Anulando…" : "Anular"}
               </button>
@@ -120,7 +112,7 @@ function AdjustPanel({ onRefresh }: { onRefresh: () => void }) {
     e.preventDefault();
     const parsed = parseFloat(amount);
     if (isNaN(parsed) || parsed === 0) {
-      setMessage("❌ Introduce un importe válido (positivo o negativo)");
+      setMessage("Introduce un importe válido (positivo o negativo)");
       return;
     }
     if (!confirm(`¿Ajustar bankroll ${parsed >= 0 ? "+" : ""}${parsed.toFixed(2)}€?`)) return;
@@ -129,14 +121,12 @@ function AdjustPanel({ onRefresh }: { onRefresh: () => void }) {
     setMessage(null);
     try {
       const r = await api.adminAdjustBankroll(parsed, note.trim());
-      setMessage(
-        `✅ Ajuste aplicado. ${r.balance_before.toFixed(2)}€ → ${r.balance_after.toFixed(2)}€`
-      );
+      setMessage(`Ajuste aplicado. ${r.balance_before.toFixed(2)}€ → ${r.balance_after.toFixed(2)}€`);
       setAmount("");
       setNote("");
       onRefresh();
     } catch (e: unknown) {
-      setMessage(`❌ Error: ${e instanceof Error ? e.message : String(e)}`);
+      setMessage(`Error: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setLoading(false);
     }
@@ -144,14 +134,11 @@ function AdjustPanel({ onRefresh }: { onRefresh: () => void }) {
 
   return (
     <section>
-      <h2 className="text-xs font-medium text-yellow-400 uppercase tracking-wider mb-3">
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest font-mono mb-4">
         Ajuste manual de bankroll
       </h2>
 
-      <form
-        onSubmit={handleSubmit}
-        className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3 max-w-md"
-      >
+      <form onSubmit={handleSubmit} className="border border-gray-100 rounded-xl p-5 space-y-3 max-w-md">
         <div>
           <label className="text-xs text-gray-400 block mb-1">
             Importe (€) — positivo para añadir, negativo para restar
@@ -162,7 +149,7 @@ function AdjustPanel({ onRefresh }: { onRefresh: () => void }) {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="+500.00 ó -200.00"
-            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-yellow-600"
+            className="w-full border border-gray-200 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-gray-900 transition-colors"
           />
         </div>
         <div>
@@ -172,18 +159,18 @@ function AdjustPanel({ onRefresh }: { onRefresh: () => void }) {
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Motivo del ajuste"
-            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-yellow-600"
+            className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:outline-none focus:border-gray-900 transition-colors"
           />
         </div>
         <button
           type="submit"
           disabled={loading}
-          className="text-sm px-4 py-2 rounded bg-yellow-700 hover:bg-yellow-600 text-white font-medium disabled:opacity-40 transition"
+          className="text-sm px-4 py-2 rounded bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-40 transition font-medium"
         >
           {loading ? "Aplicando…" : "Aplicar ajuste"}
         </button>
         {message && (
-          <p className="text-sm text-gray-300 pt-1">{message}</p>
+          <p className="text-sm text-gray-600 pt-1">{message}</p>
         )}
       </form>
     </section>
@@ -192,32 +179,26 @@ function AdjustPanel({ onRefresh }: { onRefresh: () => void }) {
 
 // ── Activity log ───────────────────────────────────────────────────────────────
 
-function ActivityPanel({
-  events,
-  loading,
-}: {
-  events: ActivityEvent[];
-  loading: boolean;
-}) {
+function ActivityPanel({ events, loading }: { events: ActivityEvent[]; loading: boolean }) {
   return (
     <section>
-      <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">
-        Log de actividad ({events.length} eventos recientes)
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest font-mono mb-4">
+        Log de actividad ({events.length} eventos)
       </h2>
 
       {loading ? (
         <div className="space-y-1">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-8 bg-gray-900 rounded animate-pulse" />
+            <div key={i} className="h-8 bg-gray-50 rounded animate-pulse" />
           ))}
         </div>
       ) : events.length === 0 ? (
-        <p className="text-gray-500 text-sm py-4">Sin actividad registrada</p>
+        <p className="text-gray-400 text-sm py-4">Sin actividad registrada</p>
       ) : (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+        <div className="border border-gray-100 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-xs text-gray-500 uppercase border-b border-gray-800">
+              <tr className="text-xs text-gray-400 uppercase border-b border-gray-100 font-mono">
                 <th className="text-left px-4 py-2">Tipo</th>
                 <th className="text-right px-4 py-2">Cambio</th>
                 <th className="text-right px-4 py-2">Saldo</th>
@@ -229,25 +210,25 @@ function ActivityPanel({
               {events.map((e, idx) => (
                 <tr
                   key={e.id}
-                  className={`border-b border-gray-800/50 ${idx % 2 === 0 ? "" : "bg-gray-900/40"}`}
+                  className={`border-b border-gray-50 ${idx % 2 === 0 ? "" : "bg-gray-50/50"}`}
                 >
-                  <td className={`px-4 py-2 font-medium ${EVENT_COLORS[e.event_type] ?? "text-gray-300"}`}>
+                  <td className="px-4 py-2 text-gray-700 font-medium">
                     {EVENT_LABELS[e.event_type] ?? e.event_type}
                   </td>
                   <td
-                    className={`px-4 py-2 text-right font-mono text-xs ${
-                      e.amount_change >= 0 ? "text-green-400" : "text-red-400"
+                    className={`px-4 py-2 text-right font-mono text-xs font-semibold ${
+                      e.amount_change >= 0 ? "text-green-600" : "text-red-500"
                     }`}
                   >
                     {fmt(e.amount_change)}
                   </td>
-                  <td className="px-4 py-2 text-right font-mono text-xs text-gray-200">
+                  <td className="px-4 py-2 text-right font-mono text-xs text-gray-900">
                     {e.balance_after.toFixed(2)}€
                   </td>
-                  <td className="px-4 py-2 text-xs text-gray-500 hidden sm:table-cell max-w-xs truncate">
+                  <td className="px-4 py-2 text-xs text-gray-400 hidden sm:table-cell max-w-xs truncate">
                     {e.note ?? "—"}
                   </td>
-                  <td className="px-4 py-2 text-right text-xs text-gray-600 hidden md:table-cell whitespace-nowrap">
+                  <td className="px-4 py-2 text-right text-xs text-gray-400 hidden md:table-cell whitespace-nowrap">
                     {e.created_at ? new Date(e.created_at).toLocaleString("es-ES") : "—"}
                   </td>
                 </tr>
@@ -281,26 +262,33 @@ export default function Admin() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Panel de administración</h1>
+    <div className="max-w-2xl mx-auto px-6 py-12">
+      <Link
+        to="/"
+        className="text-xs text-gray-400 hover:text-gray-900 transition-colors flex items-center gap-1 mb-8"
+      >
+        ← Club Kelly
+      </Link>
+
+      <div className="flex items-center justify-between mb-10">
+        <h1 className="text-3xl font-black tracking-tight">Admin</h1>
         <button
           onClick={refreshAll}
-          className="text-xs text-gray-400 hover:text-white transition px-3 py-1.5 border border-gray-700 rounded"
+          className="text-xs text-gray-400 hover:text-gray-900 transition-colors px-3 py-1.5 border border-gray-200 rounded hover:border-gray-400"
         >
           Actualizar
         </button>
       </div>
 
-      <OpenBetsPanel
-        bets={openBets ?? []}
-        loading={betsLoading}
-        onRefresh={refreshAll}
-      />
-
-      <AdjustPanel onRefresh={refreshAll} />
-
-      <ActivityPanel events={activity ?? []} loading={actLoading} />
+      <div className="space-y-10">
+        <OpenBetsPanel
+          bets={openBets ?? []}
+          loading={betsLoading}
+          onRefresh={refreshAll}
+        />
+        <AdjustPanel onRefresh={refreshAll} />
+        <ActivityPanel events={activity ?? []} loading={actLoading} />
+      </div>
     </div>
   );
 }
