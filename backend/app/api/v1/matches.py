@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query
@@ -5,8 +6,10 @@ from sqlalchemy.orm import Session, joinedload
 
 from backend.app.api.deps import get_db_session
 from backend.app.models.match import Match, MatchStatus
+from backend.app.models.prediction import Prediction
 from backend.app.schemas.match import MatchFinished, MatchUpcoming
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/matches", tags=["matches"])
 
 
@@ -25,7 +28,7 @@ def list_upcoming_matches(
         .options(
             joinedload(Match.home_team),
             joinedload(Match.away_team),
-            joinedload(Match.predictions).joinedload("market_type"),
+            joinedload(Match.predictions).joinedload(Prediction.market_type),
         )
         .filter(Match.status.in_([MatchStatus.SCHEDULED, MatchStatus.LIVE]))
         .order_by(Match.match_date.asc())
@@ -33,7 +36,11 @@ def list_upcoming_matches(
     )
     if competition_slug:
         q = q.join(Match.competition).filter_by(slug=competition_slug)
-    return q.all()
+    try:
+        return q.all()
+    except Exception:
+        logger.exception("Error in /v1/matches/upcoming")
+        raise
 
 
 @router.get("/past", response_model=list[MatchFinished])
