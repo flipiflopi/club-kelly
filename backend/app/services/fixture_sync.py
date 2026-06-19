@@ -41,6 +41,7 @@ class SyncStats:
     matches_updated: int = 0
     bets_resolved: int = 0
     retrain: dict | None = None
+    resolved_match_ids: list[int] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
 
@@ -144,6 +145,7 @@ def sync_results(competition_slug: str, db: Session, days_back: int = 3) -> Sync
                 stats.bets_resolved += len(resolved)
                 stats.matches_updated += 1
                 newly_finished.append(match)
+                stats.resolved_match_ids.append(match.id)
                 logger.info(
                     "Match %d finished %d-%d, resolved %d bets",
                     match.id,

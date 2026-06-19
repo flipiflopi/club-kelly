@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     # n8n webhooks
     webhook_api_key: str = ""   # empty = no auth required
 
+    # Telegram notifications
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""  # channel @name or numeric group/chat ID
+
 
 @lru_cache
 def get_settings() -> Settings:

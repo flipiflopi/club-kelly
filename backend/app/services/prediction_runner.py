@@ -58,6 +58,8 @@ class RunResult:
     matches_evaluated: int = 0
     predictions_saved: int = 0
     bets_placed: int = 0
+    bet_match_ids: list[int] = field(default_factory=list)
+    no_bet_match_ids: list[int] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
 
@@ -205,6 +207,12 @@ def _run_for_competition(
             result.matches_evaluated += 1
             result.predictions_saved += n_preds
             result.bets_placed += n_bets
+            if n_preds > 0 and n_bets > 0:
+                result.bet_match_ids.append(match.id)
+                _notify_bet_placed(match, db)
+            elif n_preds > 0:
+                result.no_bet_match_ids.append(match.id)
+                _notify_no_bet(match, db)
         except Exception as exc:
             msg = f"Match {match.id}: {exc}"
             logger.error(msg, exc_info=True)
@@ -649,3 +657,88 @@ def _fetch_odds_map(match: Match, odds_source) -> dict[str, dict[str, float]]:
     for dto in odds_list:
         result[dto.market_slug] = dto.outcomes
     return result
+
+
+# ── Private: Telegram helpers ─────────────────────────────────────────────────
+
+
+def _notify_no_bet(match: Match, db: Session) -> None:
+    settings = get_settings()
+    if not settings.telegram_bot_token or not settings.telegram_chat_id:
+        return
+    try:
+        from backend.app.services.telegram_notifier import notify_no_bet
+
+        preds = (
+            db.query(Prediction)
+            .join(Prediction.market_type)
+            .filter(
+                Prediction.match_id == match.id,
+                Prediction.model_version == MODEL_VERSION,
+            )
+            .all()
+        )
+        mr_preds = [p for p in preds if p.market_type and p.market_type.slug == "match_result"]
+        pred_data = [
+            {
+                "outcome": p.outcome,
+                "model_probability": round(p.model_probability * 100, 1),
+                "market_odds": p.market_odds,
+                "edge_pct": round(p.edge * 100, 1) if p.edge else None,
+            }
+            for p in mr_preds
+        ]
+        notify_no_bet(
+            home_team=match.home_team.name,
+            away_team=match.away_team.name,
+            match_date=match.match_date,
+            round_name=match.round,
+            predictions=pred_data,
+            token=settings.telegram_bot_token,
+            chat_id=settings.telegram_chat_id,
+        )
+    except Exception as exc:
+        logger.warning("Telegram notify_no_bet failed: %s", exc)
+
+
+def _notify_bet_placed(match: Match, db: Session) -> None:
+    settings = get_settings()
+    if not settings.telegram_bot_token or not settings.telegram_chat_id:
+        return
+    try:
+        from backend.app.services.telegram_notifier import notify_bet_placed
+
+        bets = (
+            db.query(SimulatedBet)
+            .join(SimulatedBet.prediction)
+            .join(Prediction.market_type)
+            .filter(
+                SimulatedBet.match_id == match.id,
+                SimulatedBet.status == BetStatus.OPEN,
+            )
+            .all()
+        )
+        bet_data = [
+            {
+                "outcome": b.prediction.outcome,
+                "model_probability": round(b.prediction.model_probability * 100, 1),
+                "market_odds": b.prediction.market_odds,
+                "edge_pct": round(b.prediction.edge * 100, 1) if b.prediction.edge else None,
+                "stake_amount": b.stake_amount,
+                "stake_pct": round(b.stake_pct * 100, 1),
+                "decimal_odds": b.decimal_odds,
+            }
+            for b in bets
+        ]
+        notify_bet_placed(
+            home_team=match.home_team.name,
+            away_team=match.away_team.name,
+            match_date=match.match_date,
+            round_name=match.round,
+            bets=bet_data,
+            current_bankroll=_get_current_bankroll(db),
+            token=settings.telegram_bot_token,
+            chat_id=settings.telegram_chat_id,
+        )
+    except Exception as exc:
+        logger.warning("Telegram notify_bet_placed failed: %s", exc)

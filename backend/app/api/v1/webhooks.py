@@ -46,6 +46,7 @@ class SyncResultsResponse(BaseModel):
     competition: str
     matches_updated: int
     bets_resolved: int
+    resolved_match_ids: list[int] = []
     retrain: dict | None = None
     errors: list[str] = []
 
@@ -55,6 +56,8 @@ class RunPredictionsResponse(BaseModel):
     matches_evaluated: int
     predictions_saved: int
     bets_placed: int
+    bet_match_ids: list[int] = []
+    no_bet_match_ids: list[int] = []
     errors: list[str] = []
 
 
@@ -103,6 +106,7 @@ def webhook_sync_results(
         competition=competition,
         matches_updated=stats.matches_updated,
         bets_resolved=stats.bets_resolved,
+        resolved_match_ids=stats.resolved_match_ids,
         retrain=stats.retrain,
         errors=stats.errors[:5],
     )
@@ -128,5 +132,7 @@ def webhook_run_predictions(db: Session = Depends(get_db_session)):
         matches_evaluated=result.matches_evaluated,
         predictions_saved=result.predictions_saved,
         bets_placed=result.bets_placed,
+        bet_match_ids=result.bet_match_ids,
+        no_bet_match_ids=result.no_bet_match_ids,
         errors=result.errors[:5],
     )

@@ -116,4 +116,45 @@ def resolve_bets_for_match(match: Match, db: Session) -> list[SimulatedBet]:
         resolved.append(bet)
 
     db.commit()
+
+    if resolved:
+        _notify_resolved(match, resolved, running_balance, db)
+
     return resolved
+
+
+def _notify_resolved(match: Match, bets: list[SimulatedBet], bankroll_after: float, db: Session) -> None:
+    settings = get_settings()
+    if not settings.telegram_bot_token or not settings.telegram_chat_id:
+        return
+    try:
+        from backend.app.services.telegram_notifier import notify_bet_resolved
+
+        bankroll_before = bankroll_after - sum(b.profit_loss for b in bets if b.profit_loss)
+        bet_data = [
+            {
+                "outcome": b.prediction.outcome,
+                "decimal_odds": b.decimal_odds,
+                "stake_amount": b.stake_amount,
+                "profit_loss": b.profit_loss or 0.0,
+                "status": b.status.value if hasattr(b.status, "value") else str(b.status),
+            }
+            for b in bets
+            if b.prediction and b.status.value in ("won", "lost")
+        ]
+        if not bet_data:
+            return
+        notify_bet_resolved(
+            home_team=match.home_team.name,
+            away_team=match.away_team.name,
+            home_score=match.home_score or 0,
+            away_score=match.away_score or 0,
+            bets=bet_data,
+            bankroll_before=bankroll_before,
+            bankroll_after=bankroll_after,
+            token=settings.telegram_bot_token,
+            chat_id=settings.telegram_chat_id,
+        )
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("Telegram notify_resolved failed: %s", exc)
