@@ -38,6 +38,7 @@ class Match(Base, TimestampMixin):
     home_team: Mapped["Team"] = relationship(foreign_keys=[home_team_id])  # type: ignore[name-defined]
     away_team: Mapped["Team"] = relationship(foreign_keys=[away_team_id])  # type: ignore[name-defined]
     predictions: Mapped[list["Prediction"]] = relationship(back_populates="match")  # type: ignore[name-defined]
+    bets: Mapped[list["SimulatedBet"]] = relationship(back_populates="match")  # type: ignore[name-defined]
     player_stats: Mapped[list["PlayerMatchStats"]] = relationship(back_populates="match")  # type: ignore[name-defined]
 
     def __repr__(self) -> str:

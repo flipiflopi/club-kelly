@@ -44,8 +44,16 @@ class SimulatedBet(Base, TimestampMixin):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     prediction: Mapped["Prediction"] = relationship(back_populates="simulated_bet")  # type: ignore[name-defined]
-    match: Mapped["Match"] = relationship()  # type: ignore[name-defined]
+    match: Mapped["Match"] = relationship(back_populates="bets")  # type: ignore[name-defined]
     bankroll_events: Mapped[list["BankrollHistory"]] = relationship(back_populates="bet")  # type: ignore[name-defined]
+
+    @property
+    def outcome(self) -> str:
+        return self.prediction.outcome if self.prediction else ""
+
+    @property
+    def market_slug(self) -> str:
+        return self.prediction.market_slug if self.prediction else ""
 
     def __repr__(self) -> str:
         return f"<SimulatedBet id={self.id} {self.status} stake={self.stake_amount:.2f}€>"

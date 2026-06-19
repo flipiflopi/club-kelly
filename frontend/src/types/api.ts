@@ -14,6 +14,7 @@ export interface Prediction {
   market_slug: string;
   outcome: string;
   model_probability: number;
+  market_probability: number | null;
   market_odds: number | null;
   edge: number | null;
 }
@@ -22,10 +23,12 @@ export interface Bet {
   id: number;
   status: BetStatus;
   stake_amount: number;
-  decimal_odds: number;
-  profit_loss: number | null;
   stake_pct: number;
   bankroll_before: number;
+  decimal_odds: number;
+  profit_loss: number | null;
+  outcome: string;
+  market_slug: string;
   bankroll_after: number | null;
   kelly_fraction: number;
   reasoning_text: string | null;
@@ -46,7 +49,7 @@ export interface Match {
   venue: string | null;
   is_neutral: boolean;
   predictions?: Prediction[];
-  bets?: Bet[];
+  bets?: Bet[];  // open bets on this match (populated for upcoming matches)
 }
 
 export interface BankrollSnapshot {

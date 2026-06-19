@@ -9,8 +9,12 @@ class BetBrief(BaseModel):
     id: int
     status: BetStatus
     stake_amount: float
+    stake_pct: float
+    bankroll_before: float
     decimal_odds: float
     profit_loss: float | None = None
+    outcome: str = ""        # from prediction.outcome via @property
+    market_slug: str = ""   # from prediction.market_slug via @property
 
     model_config = {"from_attributes": True}
 

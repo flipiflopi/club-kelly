@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 from backend.app.api.deps import get_db_session
 from backend.app.models.match import Match, MatchStatus
 from backend.app.models.prediction import Prediction
+from backend.app.models.simulated_bet import SimulatedBet
 from backend.app.schemas.match import MatchFinished, MatchUpcoming
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ def list_upcoming_matches(
             joinedload(Match.home_team),
             joinedload(Match.away_team),
             joinedload(Match.predictions).joinedload(Prediction.market_type),
+            joinedload(Match.bets).joinedload(SimulatedBet.prediction).joinedload(Prediction.market_type),
         )
         .filter(Match.status.in_([MatchStatus.SCHEDULED, MatchStatus.LIVE]))
         .order_by(Match.match_date.asc())

@@ -8,6 +8,7 @@ class PredictionBrief(BaseModel):
     market_slug: str
     outcome: str
     model_probability: float
+    market_probability: float | None = None  # fair prob after vig removal
     market_odds: float | None = None
     edge: float | None = None
 
@@ -15,7 +16,6 @@ class PredictionBrief(BaseModel):
 
 
 class PredictionDetail(PredictionBrief):
-    market_probability: float | None = None
     closing_odds: float | None = None
     model_version: str
     created_at: datetime

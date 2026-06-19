@@ -31,8 +31,9 @@ class MatchBase(BaseModel):
 
 
 class MatchUpcoming(MatchBase):
-    """Match with model predictions attached."""
+    """Match with model predictions and open bets attached."""
     predictions: list["PredictionBrief"] = []
+    bets: list["BetBrief"] = []
 
 
 class MatchFinished(MatchBase):
