@@ -6,7 +6,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <nav className="border-b border-gray-800 px-6 py-3 flex gap-6 items-center">
-        <span className="font-bold text-lg text-green-400">⚽ Football Prediction</span>
+        <span className="font-bold text-lg text-green-400">La Ventaja</span>
         <NavLink
           to="/"
           end
