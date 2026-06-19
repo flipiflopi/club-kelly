@@ -27,7 +27,7 @@ from backend.app.models.team import Team
 
 logger = logging.getLogger(__name__)
 
-COMPETITIONS_DIR = Path(__file__).parents[4] / "competitions"
+COMPETITIONS_DIR = Path(__file__).parents[3] / "competitions"
 
 
 # ── Result dataclass ──────────────────────────────────────────────────────────
