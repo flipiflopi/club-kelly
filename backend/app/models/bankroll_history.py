@@ -23,7 +23,9 @@ class BankrollHistory(Base):
     __tablename__ = "bankroll_history"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    event_type: Mapped[BankrollEventType] = mapped_column(Enum(BankrollEventType), nullable=False)
+    event_type: Mapped[BankrollEventType] = mapped_column(
+        Enum(BankrollEventType, native_enum=False), nullable=False
+    )
     amount_change: Mapped[float] = mapped_column(Float, nullable=False)  # negative = loss
     balance_after: Mapped[float] = mapped_column(Float, nullable=False)
     reference_bet_id: Mapped[int | None] = mapped_column(

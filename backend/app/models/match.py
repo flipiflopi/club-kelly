@@ -24,7 +24,7 @@ class Match(Base, TimestampMixin):
     away_team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), nullable=False)
     match_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     status: Mapped[MatchStatus] = mapped_column(
-        Enum(MatchStatus), nullable=False, default=MatchStatus.SCHEDULED
+        Enum(MatchStatus, native_enum=False), nullable=False, default=MatchStatus.SCHEDULED
     )
     home_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     away_score: Mapped[int | None] = mapped_column(Integer, nullable=True)

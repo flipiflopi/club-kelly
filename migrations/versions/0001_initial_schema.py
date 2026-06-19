@@ -80,12 +80,7 @@ def upgrade() -> None:
         sa.Column("home_team_id", sa.Integer(), nullable=False),
         sa.Column("away_team_id", sa.Integer(), nullable=False),
         sa.Column("match_date", sa.DateTime(timezone=True), nullable=False),
-        sa.Column(
-            "status",
-            sa.Enum("scheduled", "live", "finished", "postponed", "cancelled", name="matchstatus"),
-            nullable=False,
-            server_default="scheduled",
-        ),
+        sa.Column("status", sa.String(32), nullable=False, server_default="scheduled"),
         sa.Column("home_score", sa.Integer(), nullable=True),
         sa.Column("away_score", sa.Integer(), nullable=True),
         sa.Column("external_id", sa.String(64), nullable=True),
@@ -193,12 +188,7 @@ def upgrade() -> None:
         sa.Column("kelly_fraction", sa.Float(), nullable=False),
         sa.Column("decimal_odds", sa.Float(), nullable=False),
         sa.Column("reasoning_text", sa.Text(), nullable=True),
-        sa.Column(
-            "status",
-            sa.Enum("open", "won", "lost", "void", name="betstatus"),
-            nullable=False,
-            server_default="open",
-        ),
+        sa.Column("status", sa.String(16), nullable=False, server_default="open"),
         sa.Column("profit_loss", sa.Float(), nullable=True),
         sa.Column("bankroll_after", sa.Float(), nullable=True),
         sa.Column("resolved_at", sa.DateTime(timezone=True), nullable=True),
@@ -216,11 +206,7 @@ def upgrade() -> None:
     op.create_table(
         "bankroll_history",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column(
-            "event_type",
-            sa.Enum("initial", "bet_placed", "bet_resolved", "adjustment", name="bankrolleventtype"),
-            nullable=False,
-        ),
+        sa.Column("event_type", sa.String(32), nullable=False),
         sa.Column("amount_change", sa.Float(), nullable=False),
         sa.Column("balance_after", sa.Float(), nullable=False),
         sa.Column("reference_bet_id", sa.Integer(), nullable=True),
@@ -243,8 +229,3 @@ def downgrade() -> None:
     op.drop_table("players")
     op.drop_table("competitions")
     op.drop_table("teams")
-
-    # Drop PostgreSQL enums explicitly
-    op.execute("DROP TYPE IF EXISTS matchstatus")
-    op.execute("DROP TYPE IF EXISTS betstatus")
-    op.execute("DROP TYPE IF EXISTS bankrolleventtype")

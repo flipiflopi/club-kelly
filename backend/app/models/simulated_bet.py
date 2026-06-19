@@ -37,7 +37,7 @@ class SimulatedBet(Base, TimestampMixin):
     reasoning_text: Mapped[str | None] = mapped_column(Text, nullable=True)  # from Claude API
 
     status: Mapped[BetStatus] = mapped_column(
-        Enum(BetStatus), nullable=False, default=BetStatus.OPEN
+        Enum(BetStatus, native_enum=False), nullable=False, default=BetStatus.OPEN
     )
     profit_loss: Mapped[float | None] = mapped_column(Float, nullable=True)  # + win / - loss
     bankroll_after: Mapped[float | None] = mapped_column(Float, nullable=True)
