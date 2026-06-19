@@ -315,7 +315,7 @@ export default function History() {
         ) : (
           <BankrollChart
             events={chartData ?? []}
-            initial={snapshot?.initial_balance ?? 1000}
+            initial={snapshot?.initial_balance ?? 0}
           />
         )}
       </div>

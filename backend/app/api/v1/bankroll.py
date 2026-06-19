@@ -14,8 +14,15 @@ router = APIRouter(prefix="/bankroll", tags=["bankroll"])
 @router.get("/snapshot", response_model=BankrollSnapshot)
 def get_bankroll_snapshot(db: Session = Depends(get_db_session)):
     """Current bankroll state and high-level P&L summary."""
-    settings = get_settings()
-    initial = settings.initial_bankroll
+    from backend.app.models.bankroll_history import BankrollEventType
+
+    initial_event = (
+        db.query(BankrollHistory)
+        .filter(BankrollHistory.event_type == BankrollEventType.INITIAL)
+        .order_by(BankrollHistory.id.asc())
+        .first()
+    )
+    initial = initial_event.balance_after if initial_event else get_settings().initial_bankroll
 
     latest_event = (
         db.query(BankrollHistory)
