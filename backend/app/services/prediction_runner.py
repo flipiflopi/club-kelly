@@ -47,7 +47,7 @@ from engine.models.dixon_coles import DixonColesModel, DixonColesParams
 logger = logging.getLogger(__name__)
 
 COMPETITIONS_DIR = Path(__file__).parents[4] / "competitions"
-MODEL_VERSION = "dixon_coles_v1"
+MODEL_VERSION = "ensemble_v1"
 
 
 # ── Result dataclass ──────────────────────────────────────────────────────────
@@ -167,6 +167,15 @@ def _run_for_competition(
     min_edge: float = config["edge"]["min_edge"]
     kelly_multiplier: float = config["kelly"]["multiplier"]
 
+    ensemble_cfg = config.get("ensemble", {})
+    dc_weight: float = ensemble_cfg.get("dc_weight", 1.0)
+    elo_weight: float = ensemble_cfg.get("elo_weight", 0.0)
+    max_disagreement: float = ensemble_cfg.get("max_model_disagreement", 0.15)
+
+    elo_model = _load_elo_from_db(db) if elo_weight > 0 else None
+    if elo_weight > 0 and elo_model is None:
+        logger.warning("Elo weight > 0 but no Elo ratings found in DB — using DC only")
+
     upcoming = _get_unpredicted_matches(competition.id, db)
     logger.info(
         "Competition %s: %d unpredicted upcoming matches",
@@ -182,6 +191,10 @@ def _run_for_competition(
             n_preds, n_bets = _process_match(
                 match=match,
                 model=model,
+                elo_model=elo_model,
+                dc_weight=dc_weight,
+                elo_weight=elo_weight,
+                max_disagreement=max_disagreement,
                 market_types=market_types,
                 risk_cfg=risk_cfg,
                 min_edge=min_edge,
@@ -210,6 +223,10 @@ def _process_match(
     kelly_multiplier: float,
     odds_source,
     db: Session,
+    elo_model=None,
+    dc_weight: float = 1.0,
+    elo_weight: float = 0.0,
+    max_disagreement: float = 0.15,
 ) -> tuple[int, int]:
     """
     Run all 4 decision layers for one match.
@@ -247,13 +264,51 @@ def _process_match(
         if market_slug not in market_registry:
             continue
 
-        # Layer 1b: market-specific probabilities
+        # Layer 1b: market-specific probabilities (Dixon-Coles)
         market_module = market_registry.get(market_slug)
-        outcome_probs: dict[str, float] = market_module.calculate(score_matrix)
+        dc_probs: dict[str, float] = market_module.calculate(score_matrix)
+
+        # Elo probabilities for 1X2 market (if available)
+        elo_probs: dict[str, float] | None = None
+        if (
+            elo_model is not None
+            and elo_weight > 0
+            and market_slug == "match_result"
+            and home_name in elo_model.known_teams()
+            and away_name in elo_model.known_teams()
+        ):
+            elo_probs = elo_model.predict_outcome_probs(
+                home_name, away_name, is_neutral=match.is_neutral
+            )
 
         market_odds_dict: dict[str, float] = odds_map.get(market_slug, {})
 
-        for outcome, model_prob in outcome_probs.items():
+        for outcome, dc_prob in dc_probs.items():
+            # ── Ensemble: blend DC + Elo if available for this market/outcome ──
+            if elo_probs and outcome in elo_probs:
+                elo_prob = elo_probs[outcome]
+
+                # Consensus filter: if models disagree too much, skip this outcome.
+                # A large gap signals a likely DC model error, not genuine edge.
+                if abs(dc_prob - elo_prob) > max_disagreement:
+                    logger.info(
+                        "Match %d %s/%s: DC=%.0f%% vs Elo=%.0f%% (diff %.0fpp > %.0fpp limit) — skipping",
+                        match.id, market_slug, outcome,
+                        dc_prob * 100, elo_prob * 100,
+                        abs(dc_prob - elo_prob) * 100,
+                        max_disagreement * 100,
+                    )
+                    continue
+
+                total_w = dc_weight + elo_weight
+                model_prob = (dc_weight * dc_prob + elo_weight * elo_prob) / total_w
+                logger.debug(
+                    "Match %d %s/%s: DC=%.0f%% Elo=%.0f%% → ensemble=%.0f%%",
+                    match.id, market_slug, outcome,
+                    dc_prob * 100, elo_prob * 100, model_prob * 100,
+                )
+            else:
+                model_prob = dc_prob  # no Elo for this market — use DC only
             decimal_odds = market_odds_dict.get(outcome)
 
             # Always save the prediction (full audit trail regardless of bet decision)
@@ -530,6 +585,34 @@ def _get_daily_exposure(db: Session, exclude_match_id: int | None = None) -> flo
 
 
 # ── Private: odds fetching ────────────────────────────────────────────────────
+
+
+def _load_elo_from_db(db: Session):
+    """
+    Reconstruct an EloModel from the latest elo_ratings rows.
+    Returns None if the table is empty (Elo not yet trained).
+    """
+    try:
+        from backend.app.models.elo_rating import EloRating
+        from engine.models.elo import EloModel, EloParams
+
+        rows = (
+            db.query(EloRating)
+            .options(joinedload(EloRating.team))
+            .all()
+        )
+        if not rows:
+            return None
+
+        params = EloParams(
+            ratings={r.team.name: r.rating for r in rows},
+            matches_played={r.team.name: r.matches_played for r in rows},
+        )
+        logger.info("Loaded Elo ratings for %d teams from DB", len(rows))
+        return EloModel.from_params(params)
+    except Exception as exc:
+        logger.warning("Could not load Elo from DB: %s", exc)
+        return None
 
 
 def _build_odds_source():

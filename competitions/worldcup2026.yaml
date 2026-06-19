@@ -8,8 +8,13 @@ model:
   rho_init: 0.08      # Dixon-Coles correlation correction initial estimate
   max_goals: 10
 
+ensemble:
+  dc_weight: 0.5                  # weight for Dixon-Coles probability
+  elo_weight: 0.5                 # weight for Elo probability
+  max_model_disagreement: 0.12    # skip outcome if models disagree by > 12pp
+
 edge:
-  min_edge: 0.03      # only bet if model prob exceeds fair market prob by ≥ 3%
+  min_edge: 0.03      # only bet if ensemble prob exceeds fair market prob by ≥ 3%
 
 kelly:
   multiplier: 0.25    # quarter Kelly — conservative for paper trading calibration phase

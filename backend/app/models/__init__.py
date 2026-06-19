@@ -9,6 +9,7 @@ from backend.app.models.prediction import Prediction
 from backend.app.models.simulated_bet import SimulatedBet, BetStatus
 from backend.app.models.bankroll_history import BankrollHistory, BankrollEventType
 from backend.app.models.player_match_stats import PlayerMatchStats
+from backend.app.models.elo_rating import EloRating
 
 __all__ = [
     "Base",
@@ -25,4 +26,5 @@ __all__ = [
     "BankrollHistory",
     "BankrollEventType",
     "PlayerMatchStats",
+    "EloRating",
 ]

@@ -44,6 +44,11 @@ def main() -> int:
         action="store_true",
         help="Skip model training (useful if you just want to seed competition + bankroll)",
     )
+    parser.add_argument(
+        "--elo-min-date",
+        default="1990-01-01",
+        help="Only use matches on/after this date for Elo training (default: 1990)",
+    )
     args = parser.parse_args()
 
     # ── Step 1: DB tables ─────────────────────────────────────────────────────
@@ -68,15 +73,18 @@ def main() -> int:
         competition_id = competition.id
     logger.info("Competition ID: %d", competition_id)
 
-    # ── Step 3: Model training + params to DB ─────────────────────────────────
+    # ── Step 3: Dixon-Coles training + params to DB ───────────────────────────
     if args.skip_model:
-        logger.warning("--skip-model set, skipping Dixon-Coles training")
+        logger.warning("--skip-model set, skipping model training")
     else:
-        logger.info("Step 3/4 — Training Dixon-Coles model…")
-        _train_and_save(args, competition_id)
+        logger.info("Step 3/5 — Training Dixon-Coles model…")
+        _train_and_save_dc(args, competition_id)
 
-    # ── Step 4: Initial bankroll entry ────────────────────────────────────────
-    logger.info("Step 4/4 — Seeding initial bankroll…")
+        logger.info("Step 4/5 — Training Elo model…")
+        _train_and_save_elo(args, competition_id)
+
+    # ── Step 5: Initial bankroll entry ────────────────────────────────────────
+    logger.info("Step 5/5 — Seeding initial bankroll…")
     from backend.app.config import get_settings
     from backend.app.models.bankroll_history import BankrollEventType, BankrollHistory
 
@@ -102,7 +110,7 @@ def main() -> int:
     return 0
 
 
-def _train_and_save(args: argparse.Namespace, competition_id: int) -> None:
+def _train_and_save_dc(args: argparse.Namespace, competition_id: int) -> None:
     csv_path = Path(args.historical_csv)
     if not csv_path.exists():
         logger.warning(
@@ -172,6 +180,86 @@ def _train_and_save(args: argparse.Namespace, competition_id: int) -> None:
         )
 
     logger.info("Model params saved for %d teams", len(params.teams))
+
+
+def _train_and_save_elo(args: argparse.Namespace, competition_id: int) -> None:
+    csv_path = Path(args.historical_csv)
+    if not csv_path.exists():
+        logger.warning("Kaggle CSV not found — skipping Elo training")
+        return
+
+    from adapters.historical.kaggle_international import KaggleInternationalSource
+
+    elo_min_date = datetime.fromisoformat(args.elo_min_date)
+    source = KaggleInternationalSource(csv_path=csv_path)
+    historical = source.get_matches(min_date=elo_min_date)
+    logger.info("Elo training: %d matches since %s", len(historical), args.elo_min_date)
+
+    if not historical:
+        logger.error("No historical matches for Elo training.")
+        return
+
+    # Sort chronologically (oldest first — Elo is sequential)
+    historical.sort(key=lambda m: m.match_date)
+
+    match_records = [
+        {
+            "home_team": m.home_team,
+            "away_team": m.away_team,
+            "home_goals": m.home_goals,
+            "away_goals": m.away_goals,
+            "tournament": m.competition,
+            "is_neutral": m.is_neutral,
+        }
+        for m in historical
+    ]
+
+    from engine.models.elo import EloModel
+    elo = EloModel(home_advantage=65.0)
+    elo.fit(match_records)
+    params = elo.params
+
+    logger.info(
+        "Elo fit complete: %d teams rated. Top 5: %s",
+        len(params.ratings),
+        sorted(params.ratings.items(), key=lambda x: -x[1])[:5],
+    )
+
+    from backend.app.database import get_session_factory
+    from backend.app.models.elo_rating import EloRating
+    from backend.app.models.team import Team
+
+    SessionLocal = get_session_factory()
+    now = datetime.now(timezone.utc)
+    saved = 0
+    skipped = 0
+
+    with SessionLocal() as db:
+        for team_name, rating in params.ratings.items():
+            team = db.query(Team).filter_by(name=team_name).first()
+            if team is None:
+                skipped += 1
+                continue
+
+            existing = db.query(EloRating).filter_by(team_id=team.id).first()
+            if existing:
+                existing.rating = rating
+                existing.matches_played = params.matches_played.get(team_name, 0)
+                existing.computed_at = now
+            else:
+                db.add(EloRating(
+                    team_id=team.id,
+                    rating=rating,
+                    matches_played=params.matches_played.get(team_name, 0),
+                    computed_at=now,
+                ))
+            saved += 1
+
+        db.commit()
+
+    logger.info("Elo ratings saved: %d teams. Skipped (not in teams table): %d", saved, skipped)
+    if skipped > 0:
+        logger.info("Note: run sync-fixtures first so all World Cup teams exist in DB")
 
 
 def _print_next_steps(args: argparse.Namespace) -> None:
