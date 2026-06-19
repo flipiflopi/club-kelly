@@ -1,0 +1,170 @@
+"""
+Admin API — manual management of bets and bankroll.
+Protected by the same X-API-Key used for webhooks.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy.orm import Session, joinedload
+
+from backend.app.api.deps import get_db_session, verify_webhook_key
+from backend.app.models.bankroll_history import BankrollEventType, BankrollHistory
+from backend.app.models.match import Match
+from backend.app.models.prediction import Prediction
+from backend.app.models.simulated_bet import BetStatus, SimulatedBet
+
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin"],
+    dependencies=[Depends(verify_webhook_key)],
+)
+
+
+# ── Schemas ───────────────────────────────────────────────────────────────────
+
+
+class AdjustRequest(BaseModel):
+    amount: float       # positive = deposit, negative = withdrawal
+    note: str = ""
+
+
+class VoidResponse(BaseModel):
+    ok: bool
+    bet_id: int
+    note: str
+
+
+class AdjustResponse(BaseModel):
+    ok: bool
+    balance_before: float
+    balance_after: float
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+
+def _current_bankroll(db: Session) -> float:
+    latest = db.query(BankrollHistory).order_by(BankrollHistory.id.desc()).first()
+    if latest:
+        return latest.balance_after
+    from backend.app.config import get_settings
+    return get_settings().initial_bankroll
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
+
+
+@router.get("/open-bets")
+def list_open_bets(db: Session = Depends(get_db_session)):
+    """All open bets with match and prediction details."""
+    bets = (
+        db.query(SimulatedBet)
+        .filter(SimulatedBet.status == BetStatus.OPEN)
+        .options(
+            joinedload(SimulatedBet.prediction).joinedload(Prediction.market_type),
+            joinedload(SimulatedBet.match).joinedload(Match.home_team),
+            joinedload(SimulatedBet.match).joinedload(Match.away_team),
+        )
+        .order_by(SimulatedBet.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": b.id,
+            "match_id": b.match_id,
+            "home_team": b.match.home_team.name if b.match and b.match.home_team else "",
+            "away_team": b.match.away_team.name if b.match and b.match.away_team else "",
+            "match_date": b.match.match_date.isoformat() if b.match else "",
+            "outcome": b.prediction.outcome if b.prediction else "",
+            "market": b.prediction.market_type.slug if b.prediction and b.prediction.market_type else "",
+            "stake_amount": b.stake_amount,
+            "stake_pct": b.stake_pct,
+            "decimal_odds": b.decimal_odds,
+            "created_at": b.created_at.isoformat() if b.created_at else "",
+        }
+        for b in bets
+    ]
+
+
+@router.post("/bets/{bet_id}/void", response_model=VoidResponse)
+def void_bet(bet_id: int, db: Session = Depends(get_db_session)):
+    """
+    Void an open bet. Bankroll is unaffected (it never changed at placement).
+    Only OPEN bets can be voided here — resolved bets require manual DB adjustment.
+    """
+    bet = db.query(SimulatedBet).filter_by(id=bet_id).first()
+    if not bet:
+        raise HTTPException(status_code=404, detail="Bet not found")
+    if bet.status != BetStatus.OPEN:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Solo se pueden anular apuestas abiertas (estado actual: {bet.status})",
+        )
+
+    bet.status = BetStatus.VOID
+    bet.profit_loss = 0.0
+    bet.resolved_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return VoidResponse(ok=True, bet_id=bet_id, note="Apuesta anulada manualmente")
+
+
+@router.post("/bankroll/adjust", response_model=AdjustResponse)
+def adjust_bankroll(body: AdjustRequest, db: Session = Depends(get_db_session)):
+    """
+    Manually adjust the bankroll (deposit, withdrawal, or correction).
+    Creates a new ADJUSTMENT entry in the bankroll history ledger.
+    """
+    if body.amount == 0:
+        raise HTTPException(status_code=400, detail="El importe no puede ser 0")
+
+    current = _current_bankroll(db)
+    new_balance = current + body.amount
+    if new_balance < 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El ajuste dejaría el bankroll en negativo ({new_balance:.2f}€)",
+        )
+
+    note = body.note or f"Ajuste manual: {body.amount:+.2f}€"
+    db.add(
+        BankrollHistory(
+            event_type=BankrollEventType.ADJUSTMENT,
+            amount_change=body.amount,
+            balance_after=new_balance,
+            note=note,
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+
+    return AdjustResponse(ok=True, balance_before=current, balance_after=new_balance)
+
+
+@router.get("/activity")
+def get_activity(
+    limit: int = Query(default=50, le=200),
+    db: Session = Depends(get_db_session),
+):
+    """Recent bankroll events (newest first)."""
+    events = (
+        db.query(BankrollHistory)
+        .order_by(BankrollHistory.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "id": e.id,
+            "event_type": e.event_type,
+            "amount_change": e.amount_change,
+            "balance_after": e.balance_after,
+            "note": e.note,
+            "created_at": e.created_at.isoformat() if e.created_at else "",
+        }
+        for e in events
+    ]

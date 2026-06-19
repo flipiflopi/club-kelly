@@ -1,6 +1,7 @@
 import { Route, Routes, NavLink } from "react-router-dom";
 import Upcoming from "./pages/Upcoming";
 import History from "./pages/History";
+import Admin from "./pages/Admin";
 
 export default function App() {
   return (
@@ -24,11 +25,20 @@ export default function App() {
         >
           History
         </NavLink>
+        <NavLink
+          to="/admin"
+          className={({ isActive }) =>
+            isActive ? "text-white font-medium" : "text-gray-400 hover:text-white"
+          }
+        >
+          Admin
+        </NavLink>
       </nav>
       <main className="max-w-5xl mx-auto px-4 py-6">
         <Routes>
           <Route path="/" element={<Upcoming />} />
           <Route path="/history" element={<History />} />
+          <Route path="/admin" element={<Admin />} />
         </Routes>
       </main>
     </div>

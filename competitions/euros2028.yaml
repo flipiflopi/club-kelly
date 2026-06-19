@@ -1,0 +1,33 @@
+slug: euros2028
+name: "UEFA Euro 2028"
+season: "2028"
+competition_type: national_team
+
+model:
+  xi: 0.0023          # same as World Cup — national teams play infrequently
+  rho_init: 0.08
+  max_goals: 10
+
+ensemble:
+  dc_weight: 0.5
+  elo_weight: 0.5
+  max_model_disagreement: 0.12
+
+edge:
+  min_edge: 0.03
+
+kelly:
+  multiplier: 0.25
+
+risk:
+  max_bet_pct: 0.03
+  max_daily_exposure_pct: 0.15
+  min_odds: 1.30
+  max_odds: 5.00
+  max_model_overestimate_ratio: 2.0
+
+data:
+  fixture_source: OddsApiFixtureSource
+  odds_source: TheOddsApiSource
+  odds_sport_key: soccer_uefa_european_championship
+  historical_source: KaggleInternationalSource

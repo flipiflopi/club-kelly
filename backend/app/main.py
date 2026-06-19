@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.api.v1 import matches, bets, bankroll, webhooks
+from backend.app.api.v1 import matches, bets, bankroll, webhooks, admin
 from backend.app.config import get_settings
 from backend.app.database import get_engine
 from backend.app.models import Base  # noqa: F401 — ensures all models are registered
@@ -55,6 +55,7 @@ def create_app() -> FastAPI:
     app.include_router(bets.router, prefix="/v1")
     app.include_router(bankroll.router, prefix="/v1")
     app.include_router(webhooks.router, prefix="/v1")
+    app.include_router(admin.router, prefix="/v1")
 
     @app.get("/health")
     def health():

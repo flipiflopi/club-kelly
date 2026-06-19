@@ -74,14 +74,32 @@ def main() -> int:
     logger.info("Competition ID: %d", competition_id)
 
     # ── Step 3: Dixon-Coles training + params to DB ───────────────────────────
+    competition_type = config.get("competition_type", "club")
+    dc_weight = config.get("ensemble", {}).get("dc_weight", 1.0)
+    elo_weight = config.get("ensemble", {}).get("elo_weight", 0.0)
+    is_national = competition_type == "national_team"
+
     if args.skip_model:
         logger.warning("--skip-model set, skipping model training")
+    elif not is_national:
+        logger.info(
+            "Step 3-4/5 — Club competition: no historical club CSV available.\n"
+            "  DC training skipped (dc_weight=%.1f).\n"
+            "  Elo starts at 1500 for all teams and builds as results come in.",
+            dc_weight,
+        )
     else:
-        logger.info("Step 3/5 — Training Dixon-Coles model…")
-        _train_and_save_dc(args, competition_id)
+        if dc_weight > 0:
+            logger.info("Step 3/5 — Training Dixon-Coles model…")
+            _train_and_save_dc(args, competition_id)
+        else:
+            logger.info("Step 3/5 — dc_weight=0 in config, skipping Dixon-Coles training")
 
-        logger.info("Step 4/5 — Training Elo model…")
-        _train_and_save_elo(args, competition_id)
+        if elo_weight > 0:
+            logger.info("Step 4/5 — Training Elo model…")
+            _train_and_save_elo(args, competition_id)
+        else:
+            logger.info("Step 4/5 — elo_weight=0 in config, skipping Elo training")
 
     # ── Step 5: Initial bankroll entry ────────────────────────────────────────
     logger.info("Step 5/5 — Seeding initial bankroll…")

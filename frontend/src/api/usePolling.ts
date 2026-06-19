@@ -3,13 +3,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export function usePolling<T>(
   fetcher: () => Promise<T>,
   intervalMs = 30_000
-): { data: T | null; error: Error | null; loading: boolean } {
+): { data: T | null; error: Error | null; loading: boolean; refresh: () => void } {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetch = useCallback(async () => {
+  const doFetch = useCallback(async () => {
     try {
       const result = await fetcher();
       setData(result);
@@ -22,12 +22,12 @@ export function usePolling<T>(
   }, [fetcher]);
 
   useEffect(() => {
-    fetch();
-    timerRef.current = setInterval(fetch, intervalMs);
+    doFetch();
+    timerRef.current = setInterval(doFetch, intervalMs);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [fetch, intervalMs]);
+  }, [doFetch, intervalMs]);
 
-  return { data, error, loading };
+  return { data, error, loading, refresh: doFetch };
 }

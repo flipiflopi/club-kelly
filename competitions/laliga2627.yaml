@@ -1,0 +1,35 @@
+slug: laliga2627
+name: "La Liga 2026-27"
+season: "2026-27"
+competition_type: club
+
+# Same as UCL: Elo-only, builds calibration over the season.
+
+model:
+  xi: 0.0065
+  rho_init: 0.08
+  max_goals: 10
+
+ensemble:
+  dc_weight: 0.0
+  elo_weight: 1.0
+  max_model_disagreement: 0.15
+
+edge:
+  min_edge: 0.04
+
+kelly:
+  multiplier: 0.20
+
+risk:
+  max_bet_pct: 0.02
+  max_daily_exposure_pct: 0.10
+  min_odds: 1.20
+  max_odds: 4.00
+  max_model_overestimate_ratio: 2.0
+
+data:
+  fixture_source: OddsApiFixtureSource
+  odds_source: TheOddsApiSource
+  odds_sport_key: soccer_spain_la_liga
+  historical_source: none

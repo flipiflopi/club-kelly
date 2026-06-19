@@ -1,0 +1,38 @@
+slug: ucl2627
+name: "UEFA Champions League 2026-27"
+season: "2026-27"
+competition_type: club
+
+# Club competition: no historical club CSV available.
+# DC is disabled — Elo-only from the start.
+# Ratings begin at 1500 for all teams and update after each result.
+# After ~10 matches per team the model becomes meaningfully calibrated.
+
+model:
+  xi: 0.0065          # faster decay — club form changes quicker than national teams
+  rho_init: 0.08
+  max_goals: 10
+
+ensemble:
+  dc_weight: 0.0      # DC disabled: no club historical data for training
+  elo_weight: 1.0
+  max_model_disagreement: 0.15
+
+edge:
+  min_edge: 0.04      # slightly higher bar — Elo-only is less precise early in the season
+
+kelly:
+  multiplier: 0.20    # more conservative while model is building calibration
+
+risk:
+  max_bet_pct: 0.02   # smaller max stake — less confident early on
+  max_daily_exposure_pct: 0.10
+  min_odds: 1.30
+  max_odds: 4.00
+  max_model_overestimate_ratio: 2.0
+
+data:
+  fixture_source: OddsApiFixtureSource
+  odds_source: TheOddsApiSource
+  odds_sport_key: soccer_uefa_champs_league
+  historical_source: none   # no club CSV — Elo starts from scratch

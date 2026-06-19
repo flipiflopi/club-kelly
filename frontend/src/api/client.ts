@@ -8,6 +8,42 @@ async function get<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function post<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: body != null ? { "Content-Type": "application/json" } : {},
+    body: body != null ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const detail = await res.json().then((d) => d?.detail ?? res.statusText).catch(() => res.statusText);
+    throw new Error(detail);
+  }
+  return res.json() as Promise<T>;
+}
+
+export type AdminBet = {
+  id: number;
+  match_id: number;
+  home_team: string;
+  away_team: string;
+  match_date: string;
+  outcome: string;
+  market: string;
+  stake_amount: number;
+  stake_pct: number;
+  decimal_odds: number;
+  created_at: string;
+};
+
+export type ActivityEvent = {
+  id: number;
+  event_type: string;
+  amount_change: number;
+  balance_after: number;
+  note: string | null;
+  created_at: string;
+};
+
 export const api = {
   getUpcomingMatches: (competitionSlug?: string) =>
     get<Match[]>(
@@ -26,4 +62,16 @@ export const api = {
 
   getBankrollHistory: (limit = 100) =>
     get<BankrollEvent[]>(`/v1/bankroll/history?limit=${limit}`),
+
+  // Admin
+  adminGetOpenBets: () => get<AdminBet[]>("/v1/admin/open-bets"),
+  adminVoidBet: (betId: number) =>
+    post<{ ok: boolean; bet_id: number; note: string }>(`/v1/admin/bets/${betId}/void`),
+  adminAdjustBankroll: (amount: number, note: string) =>
+    post<{ ok: boolean; balance_before: number; balance_after: number }>(
+      "/v1/admin/bankroll/adjust",
+      { amount, note }
+    ),
+  adminGetActivity: (limit = 50) =>
+    get<ActivityEvent[]>(`/v1/admin/activity?limit=${limit}`),
 };
