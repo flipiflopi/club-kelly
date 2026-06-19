@@ -7,9 +7,19 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from backend.app.config import get_settings
 from backend.app.models.bankroll_history import BankrollEventType, BankrollHistory
 from backend.app.models.match import Match, MatchStatus
 from backend.app.models.simulated_bet import BetStatus, SimulatedBet
+
+
+def _get_current_bankroll(db: Session) -> float:
+    latest = (
+        db.query(BankrollHistory)
+        .order_by(BankrollHistory.id.desc())
+        .first()
+    )
+    return latest.balance_after if latest else get_settings().initial_bankroll
 
 
 def _determine_outcome(bet: SimulatedBet, match: Match) -> BetStatus:
@@ -71,6 +81,10 @@ def resolve_bets_for_match(match: Match, db: Session) -> list[SimulatedBet]:
     now = datetime.now(timezone.utc)
     resolved = []
 
+    # Running bankroll: starts from the last resolved event (not from placement time).
+    # Bankroll only changes at resolution, never at bet placement.
+    running_balance = _get_current_bankroll(db)
+
     for bet in open_bets:
         status = _determine_outcome(bet, match)
 
@@ -81,18 +95,18 @@ def resolve_bets_for_match(match: Match, db: Session) -> list[SimulatedBet]:
         else:
             profit_loss = 0.0
 
-        bankroll_after = bet.bankroll_before + profit_loss
+        running_balance += profit_loss
 
         bet.status = status
         bet.profit_loss = profit_loss
-        bet.bankroll_after = bankroll_after
+        bet.bankroll_after = running_balance
         bet.resolved_at = now
 
         db.add(
             BankrollHistory(
                 event_type=BankrollEventType.BET_RESOLVED,
                 amount_change=profit_loss,
-                balance_after=bankroll_after,
+                balance_after=running_balance,
                 reference_bet_id=bet.id,
                 note=f"Match {match.id} resolved: {status.value}",
                 created_at=now,

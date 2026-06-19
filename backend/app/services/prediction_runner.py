@@ -31,7 +31,7 @@ import yaml
 from sqlalchemy.orm import Session, joinedload
 
 from backend.app.config import get_settings
-from backend.app.models.bankroll_history import BankrollEventType, BankrollHistory
+from backend.app.models.bankroll_history import BankrollHistory
 from backend.app.models.competition import Competition
 from backend.app.models.market_type import MarketType
 from backend.app.models.match import Match, MatchStatus
@@ -327,19 +327,10 @@ def _process_match(
             db.add(bet)
             db.flush()
 
-            db.add(
-                BankrollHistory(
-                    event_type=BankrollEventType.BET_PLACED,
-                    amount_change=-stake_eur,  # stake leaves bankroll
-                    balance_after=current_bankroll - stake_eur,
-                    reference_bet_id=bet.id,
-                    note=f"{match.home_team.name} vs {match.away_team.name} | {market_slug} {outcome} @ {decimal_odds}",
-                    created_at=datetime.now(timezone.utc),
-                )
-            )
-
+            # Paper trading: bankroll only changes at resolution (win/loss), not at placement.
+            # We still update in-memory so subsequent bets in this run are sized correctly.
             this_match_stakes.append(stake_eur)
-            current_bankroll -= stake_eur  # update in-memory for subsequent bets this run
+            current_bankroll -= stake_eur
             n_bets += 1
 
             logger.info(
