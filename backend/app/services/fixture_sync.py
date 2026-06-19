@@ -40,6 +40,7 @@ class SyncStats:
     matches_created: int = 0
     matches_updated: int = 0
     bets_resolved: int = 0
+    retrain: dict | None = None
     errors: list[str] = field(default_factory=list)
 
 
@@ -96,7 +97,7 @@ def sync_fixtures(competition_slug: str, db: Session) -> SyncStats:
 def sync_results(competition_slug: str, db: Session, days_back: int = 3) -> SyncStats:
     """
     Fetch recently finished matches, update their scores/status in the DB,
-    and trigger bet resolution for any that just transitioned to FINISHED.
+    and trigger bet resolution + model retraining for any that just finished.
     """
     from backend.app.services.bet_resolver import resolve_bets_for_match
 
@@ -113,6 +114,8 @@ def sync_results(competition_slug: str, db: Session, days_back: int = 3) -> Sync
         logger.error(msg, exc_info=True)
         stats.errors.append(msg)
         return stats
+
+    newly_finished: list[Match] = []
 
     for fixture in recent:
         if fixture.status != "finished":
@@ -140,6 +143,7 @@ def sync_results(competition_slug: str, db: Session, days_back: int = 3) -> Sync
                 resolved = resolve_bets_for_match(match, db)
                 stats.bets_resolved += len(resolved)
                 stats.matches_updated += 1
+                newly_finished.append(match)
                 logger.info(
                     "Match %d finished %d-%d, resolved %d bets",
                     match.id,
@@ -154,11 +158,26 @@ def sync_results(competition_slug: str, db: Session, days_back: int = 3) -> Sync
             stats.errors.append(msg)
 
     db.commit()
+
+    # Retrain models whenever new results arrive
+    if newly_finished:
+        logger.info("Retraining models after %d new result(s)…", len(newly_finished))
+        try:
+            from backend.app.services.model_retrainer import retrain_models_after_results
+
+            retrain_stats = retrain_models_after_results(competition, newly_finished, db)
+            stats.retrain = retrain_stats
+        except Exception as exc:
+            msg = f"Model retrain failed: {exc}"
+            logger.error(msg, exc_info=True)
+            stats.errors.append(msg)
+
     logger.info(
-        "sync_results [%s]: ~%d updated, %d bets resolved, %d errors",
+        "sync_results [%s]: %d updated, %d bets resolved, retrain=%s, %d errors",
         competition_slug,
         stats.matches_updated,
         stats.bets_resolved,
+        getattr(stats, "retrain", None),
         len(stats.errors),
     )
     return stats

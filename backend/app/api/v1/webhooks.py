@@ -46,6 +46,7 @@ class SyncResultsResponse(BaseModel):
     competition: str
     matches_updated: int
     bets_resolved: int
+    retrain: dict | None = None
     errors: list[str] = []
 
 
@@ -102,6 +103,7 @@ def webhook_sync_results(
         competition=competition,
         matches_updated=stats.matches_updated,
         bets_resolved=stats.bets_resolved,
+        retrain=stats.retrain,
         errors=stats.errors[:5],
     )
 
