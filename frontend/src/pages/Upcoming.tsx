@@ -5,8 +5,8 @@ import type { Bet, Match, Prediction } from "../types/api";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const APP_NAME = "La Ventaja";
-const APP_SLOGAN = "Predicciones cuantitativas del fútbol";
+const APP_NAME = "Club Kelly";
+const APP_SLOGAN = "I don't guess. I calculate.";
 
 const MARKET_NAMES: Record<string, string> = {
   match_result: "Resultado 1X2",
