@@ -14,10 +14,12 @@ The model is competition-agnostic: it only receives match records and parameters
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 
 import numpy as np
 from scipy.optimize import minimize
+from scipy.special import gammaln
 from scipy.stats import poisson
 
 from engine.models.base import AbstractPredictionModel
@@ -76,38 +78,54 @@ def _tau(x: int, y: int, mu_h: float, mu_a: float, rho: float) -> float:
     return 1.0
 
 
-def _neg_log_likelihood(
-    v: np.ndarray,
-    matches: list[MatchRecord],
-    teams: list[str],
-    xi: float,
-) -> float:
-    n = len(teams)
+def _prepare_arrays(records: list[MatchRecord], teams: list[str], xi: float) -> dict:
+    """Pre-compute numpy arrays from match records. Called once before optimization."""
     idx = {t: i for i, t in enumerate(teams)}
+    hg = np.array([m.home_goals for m in records], dtype=np.int32)
+    ag = np.array([m.away_goals for m in records], dtype=np.int32)
+    return {
+        "hi": np.array([idx[m.home_team] for m in records], dtype=np.int32),
+        "ai": np.array([idx[m.away_team] for m in records], dtype=np.int32),
+        "hg": hg,
+        "ag": ag,
+        "w":  np.exp(-xi * np.array([m.days_ago for m in records])),
+        "log_hg_fact": gammaln(hg + 1),
+        "log_ag_fact": gammaln(ag + 1),
+        # Boolean masks for the 4 tau-correction cases (computed once)
+        "m00": (hg == 0) & (ag == 0),
+        "m01": (hg == 0) & (ag == 1),
+        "m10": (hg == 1) & (ag == 0),
+        "m11": (hg == 1) & (ag == 1),
+    }
 
-    attack = v[:n]
-    defense = v[n : 2 * n]
-    home_adv = v[2 * n]
-    rho = v[2 * n + 1]
 
-    total = 0.0
-    for m in matches:
-        hi, ai = idx[m.home_team], idx[m.away_team]
-        mu_h = np.exp(attack[hi] - defense[ai] + home_adv)
-        mu_a = np.exp(attack[ai] - defense[hi])
+def _neg_log_likelihood(v: np.ndarray, data: dict, n_teams: int) -> float:
+    """Vectorized log-likelihood — no Python loops over matches."""
+    attack   = v[:n_teams]
+    defense  = v[n_teams : 2 * n_teams]
+    home_adv = v[2 * n_teams]
+    rho      = v[2 * n_teams + 1]
 
-        tau = _tau(m.home_goals, m.away_goals, mu_h, mu_a, rho)
-        if tau <= 0:
-            return 1e12
+    mu_h = np.exp(attack[data["hi"]] - defense[data["ai"]] + home_adv)
+    mu_a = np.exp(attack[data["ai"]] - defense[data["hi"]])
 
-        weight = np.exp(-xi * m.days_ago)
-        total += weight * (
-            np.log(tau)
-            + poisson.logpmf(m.home_goals, mu_h)
-            + poisson.logpmf(m.away_goals, mu_a)
-        )
+    hg, ag = data["hg"], data["ag"]
 
-    return -total
+    # Poisson log-PMF: k*log(mu) - mu - log(k!)
+    log_pmf_h = hg * np.log(mu_h) - mu_h - data["log_hg_fact"]
+    log_pmf_a = ag * np.log(mu_a) - mu_a - data["log_ag_fact"]
+
+    # Tau correction for 4 low-scoring outcomes
+    tau = np.ones(len(hg))
+    tau[data["m00"]] = 1.0 - mu_h[data["m00"]] * mu_a[data["m00"]] * rho
+    tau[data["m01"]] = 1.0 + mu_h[data["m01"]] * rho
+    tau[data["m10"]] = 1.0 + mu_a[data["m10"]] * rho
+    tau[data["m11"]] = 1.0 - rho
+
+    if np.any(tau <= 0):
+        return 1e12
+
+    return -float(np.sum(data["w"] * (np.log(tau) + log_pmf_h + log_pmf_a)))
 
 
 class DixonColesModel(AbstractPredictionModel):
@@ -149,9 +167,15 @@ class DixonColesModel(AbstractPredictionModel):
 
         Each dict in `matches` must contain:
           home_team (str), away_team (str), home_goals (int),
-          away_goals (int), days_ago (float)
+          away_goals (int), days_ago (float ≥ 0)
         """
         records = [MatchRecord(**m) for m in matches]
+        import logging
+        logging.getLogger(__name__).info(
+            "Fitting Dixon-Coles on %d matches, %d unique teams…",
+            len(records),
+            len({m.home_team for m in records} | {m.away_team for m in records}),
+        )
         self._params = _fit(records, self.xi)
 
     def predict_score_matrix(
@@ -197,6 +221,9 @@ def _fit(records: list[MatchRecord], xi: float) -> DixonColesParams:
     )
     n = len(teams)
 
+    # Pre-compute arrays once — passed as args to every optimizer call
+    data = _prepare_arrays(records, teams, xi)
+
     # Initial guess: all zeros (log-space), small home advantage, small rho
     v0 = np.zeros(2 * n + 2)
     v0[2 * n] = 0.25      # home advantage
@@ -211,17 +238,18 @@ def _fit(records: list[MatchRecord], xi: float) -> DixonColesParams:
     result = minimize(
         _neg_log_likelihood,
         v0,
-        args=(records, teams, xi),
+        args=(data, n),
         method="SLSQP",
         bounds=bounds,
         constraints=constraints,
-        options={"maxiter": 2000, "ftol": 1e-10},
+        # ftol=1e-5 is plenty for betting decisions; 1e-10 never terminates
+        options={"maxiter": 500, "ftol": 1e-5, "disp": False},
     )
 
     if not result.success:
-        # Warn but don't crash — partial fit is still useful
-        import warnings
-        warnings.warn(f"Dixon-Coles optimization did not fully converge: {result.message}")
+        warnings.warn(
+            f"Dixon-Coles optimization did not fully converge: {result.message}"
+        )
 
     return DixonColesParams.from_vector(result.x, teams)
 
