@@ -60,7 +60,7 @@ def _format_tweet(match, bets: list, hours: int) -> str:
     else:
         body = "Kelly sees no clear edge here. No bet placed."
 
-    footer = "\n\nt.me/Club_Kelly\n#ClubKelly #WorldCup2026"
+    footer = "\n\nhttps://clubkelly.online/\nt.me/Club_Kelly\n#ClubKelly #WorldCup2026"
 
     # Twitter limit is 280 chars — truncate team names if needed
     tweet = header + body + footer
@@ -106,7 +106,7 @@ def _format_telegram(match, bets: list, hours: int) -> str:
             "Kelly sees no clear edge on this match.",
         ]
 
-    lines += ["", "#ClubKelly #WorldCup2026"]
+    lines += ["", "🌐 https://clubkelly.online/", "#ClubKelly #WorldCup2026"]
     return "\n".join(lines)
 
 
