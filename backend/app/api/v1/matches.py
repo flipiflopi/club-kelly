@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
@@ -33,7 +33,10 @@ def list_upcoming_matches(
             joinedload(Match.predictions).joinedload(Prediction.market_type),
             joinedload(Match.bets).joinedload(SimulatedBet.prediction).joinedload(Prediction.market_type),
         )
-        .filter(Match.status.in_([MatchStatus.SCHEDULED, MatchStatus.LIVE]))
+        .filter(
+            Match.status.in_([MatchStatus.SCHEDULED, MatchStatus.LIVE]),
+            Match.match_date >= datetime.now(timezone.utc) - timedelta(hours=3),
+        )
         .order_by(Match.match_date.asc())
         .limit(limit)
     )

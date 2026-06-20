@@ -113,6 +113,8 @@ def _format_telegram(match, bets: list, hours: int) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Send pre-match notifications")
     parser.add_argument("--dry-run", action="store_true", help="Print messages without sending")
+    parser.add_argument("--match-id", type=int, default=None, help="Force notification for a specific match ID (ignores time window)")
+    parser.add_argument("--hours", type=int, default=24, help="Hours label to use in the message when --match-id is set (default: 24)")
     args = parser.parse_args()
 
     from backend.app.config import get_settings
@@ -126,6 +128,38 @@ def main() -> int:
     now = datetime.now(timezone.utc)
     SessionLocal = get_session_factory()
     sent = 0
+
+    # ── Forced single-match mode ──────────────────────────────────────────────
+    if args.match_id:
+        with SessionLocal() as db:
+            match = db.query(Match).filter(Match.id == args.match_id).first()
+            if not match:
+                logger.error("Match ID %d not found", args.match_id)
+                return 1
+            bets = (
+                db.query(SimulatedBet)
+                .filter(SimulatedBet.match_id == match.id, SimulatedBet.status == BetStatus.OPEN)
+                .all()
+            )
+            for b in bets:
+                b.match = match
+            hours = args.hours
+            tweet = _format_tweet(match, bets, hours)
+            telegram_msg = _format_telegram(match, bets, hours)
+            logger.info("Forced notification: %s vs %s (bets=%d)",
+                        match.home_team.name if match.home_team else "?",
+                        match.away_team.name if match.away_team else "?",
+                        len(bets))
+            if args.dry_run:
+                print(f"\n{'='*60}")
+                print(f"TWEET ({len(tweet)} chars):\n{tweet}")
+                print(f"\nTELEGRAM:\n{telegram_msg}")
+                return 0
+            if settings.telegram_bot_token and settings.telegram_chat_id:
+                tg_send(settings.telegram_bot_token, settings.telegram_chat_id, telegram_msg)
+            post_tweet(tweet, settings.twitter_api_key, settings.twitter_api_secret,
+                       settings.twitter_access_token, settings.twitter_access_token_secret)
+        return 0
 
     with SessionLocal() as db:
         for hours in TARGETS_HOURS:
