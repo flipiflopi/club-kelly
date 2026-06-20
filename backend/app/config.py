@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""  # channel @name or numeric group/chat ID
 
+    # Twitter / X
+    twitter_api_key: str = ""
+    twitter_api_secret: str = ""
+    twitter_access_token: str = ""
+    twitter_access_token_secret: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

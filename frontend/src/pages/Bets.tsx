@@ -56,9 +56,12 @@ function BetCard({ bet }: { bet: AdminBet }) {
 export default function Bets() {
   const { data: bets, loading, error } = usePolling(api.adminGetOpenBets, 30_000);
 
-  const totalStake = bets?.reduce((s, b) => s + b.stake_amount, 0) ?? 0;
-  const totalPotential =
-    bets?.reduce((s, b) => s + b.stake_amount * (b.decimal_odds - 1), 0) ?? 0;
+  const sorted = [...(bets ?? [])].sort(
+    (a, b) => new Date(a.match_date).getTime() - new Date(b.match_date).getTime()
+  );
+
+  const totalStake = sorted.reduce((s, b) => s + b.stake_amount, 0);
+  const totalPotential = sorted.reduce((s, b) => s + b.stake_amount * (b.decimal_odds - 1), 0);
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-12">
@@ -85,7 +88,7 @@ export default function Bets() {
         </div>
       ) : error ? (
         <p className="text-red-500 text-sm">{error.message}</p>
-      ) : !bets || bets.length === 0 ? (
+      ) : !sorted || sorted.length === 0 ? (
         <div className="border-t border-gray-100 pt-12 text-center">
           <p className="text-gray-400 text-sm">No active bets at the moment.</p>
           <p className="text-gray-300 text-xs mt-2">
@@ -95,7 +98,7 @@ export default function Bets() {
       ) : (
         <>
           <div className="space-y-0">
-            {bets.map((b) => (
+            {sorted.map((b) => (
               <BetCard key={b.id} bet={b} />
             ))}
           </div>
