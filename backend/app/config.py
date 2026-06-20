@@ -29,11 +29,11 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""  # channel @name or numeric group/chat ID
 
-    # Twitter / X
-    twitter_api_key: str = ""
-    twitter_api_secret: str = ""
-    twitter_access_token: str = ""
-    twitter_access_token_secret: str = ""
+    # Twitter / X via GetXAPI (getxapi.com)
+    getxapi_key: str = ""        # GetXAPI account key (Bearer token)
+    twitter_auth_token: str = "" # X session cookie: auth_token
+    twitter_ct0: str = ""        # X session cookie: ct0 (CSRF token)
+    twitter_twid: str = ""       # X session cookie: twid (optional)
 
 
 @lru_cache

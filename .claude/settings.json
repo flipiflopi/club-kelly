@@ -9,7 +9,10 @@
       "Bash(git stash *)",
       "Bash(git commit *)",
       "Bash(uv run *)",
-      "PowerShell(cd \"c:\\\\GitHub Clones\\\\Predicci-n-Futbol\"; $env:PYTHONPATH = \".\"; python -m backend.app.commands.backtest --wc-years 2018,2022 2>&1)"
+      "PowerShell(cd \"c:\\\\GitHub Clones\\\\Predicci-n-Futbol\"; $env:PYTHONPATH = \".\"; python -m backend.app.commands.backtest --wc-years 2018,2022 2>&1)",
+      "WebFetch(domain:www.getxapi.com)",
+      "WebSearch",
+      "WebFetch(domain:docs.getxapi.com)"
     ]
   }
 }

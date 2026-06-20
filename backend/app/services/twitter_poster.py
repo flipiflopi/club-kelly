@@ -1,37 +1,51 @@
 """
-Twitter / X posting via API v2 (OAuth 1.0a user context).
-Credentials are read from Settings; if any are missing the call is silently skipped.
+Twitter / X posting via GetXAPI (third-party, pay-per-call).
+Uses the account session auth_token instead of OAuth credentials.
+Cost: $0.002 per tweet.
 """
 
 from __future__ import annotations
 
+import json
 import logging
+import urllib.request
 
 logger = logging.getLogger(__name__)
 
+ENDPOINT = "https://api.getxapi.com/twitter/tweet/create"
 
-def post_tweet(text: str, api_key: str, api_secret: str, access_token: str, access_token_secret: str) -> bool:
+
+def post_tweet(text: str, getxapi_key: str, auth_token: str, ct0: str = "", twid: str = "") -> bool:
     """
-    Post a tweet. Returns True on success, False on failure.
-    Silently skips if any credential is empty.
+    Post a tweet via GetXAPI. Returns True on success, False on failure.
+    Silently skips if credentials are missing.
     """
-    if not all([api_key, api_secret, access_token, access_token_secret]):
-        logger.debug("Twitter credentials not configured — skipping tweet")
+    if not getxapi_key or not auth_token:
+        logger.debug("GetXAPI credentials not configured — skipping tweet")
         return False
 
-    try:
-        import tweepy  # type: ignore[import-untyped]
+    payload: dict = {"text": text, "auth_token": auth_token}
+    if ct0:
+        payload["ct0"] = ct0
+    if twid:
+        payload["twid"] = twid
 
-        client = tweepy.Client(
-            consumer_key=api_key,
-            consumer_secret=api_secret,
-            access_token=access_token,
-            access_token_secret=access_token_secret,
-        )
-        response = client.create_tweet(text=text)
-        tweet_id = response.data["id"] if response.data else "?"
-        logger.info("Tweet posted: id=%s", tweet_id)
-        return True
+    try:
+        data = json.dumps(payload).encode()
+        req = urllib.request.Request(ENDPOINT, data=data, method="POST")
+        req.add_header("Authorization", f"Bearer {getxapi_key}")
+        req.add_header("Content-Type", "application/json")
+
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = json.loads(resp.read())
+            tweet_id = body.get("data", {}).get("id_str") or body.get("id_str") or "?"
+            logger.info("Tweet posted via GetXAPI: id=%s", tweet_id)
+            return True
+
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")
+        logger.error("GetXAPI HTTP %s: %s", e.code, body)
+        return False
     except Exception:
-        logger.exception("Failed to post tweet")
+        logger.exception("Failed to post tweet via GetXAPI")
         return False

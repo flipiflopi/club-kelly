@@ -157,8 +157,8 @@ def main() -> int:
                 return 0
             if settings.telegram_bot_token and settings.telegram_chat_id:
                 tg_send(settings.telegram_bot_token, settings.telegram_chat_id, telegram_msg)
-            post_tweet(tweet, settings.twitter_api_key, settings.twitter_api_secret,
-                       settings.twitter_access_token, settings.twitter_access_token_secret)
+            post_tweet(tweet, settings.getxapi_key, settings.twitter_auth_token,
+                       settings.twitter_ct0, settings.twitter_twid)
         return 0
 
     with SessionLocal() as db:
@@ -219,10 +219,10 @@ def main() -> int:
                 # Twitter
                 ok = post_tweet(
                     tweet,
-                    settings.twitter_api_key,
-                    settings.twitter_api_secret,
-                    settings.twitter_access_token,
-                    settings.twitter_access_token_secret,
+                    settings.getxapi_key,
+                    settings.twitter_auth_token,
+                    settings.twitter_ct0,
+                    settings.twitter_twid,
                 )
                 if not ok:
                     logger.warning("Tweet not sent (check Twitter credentials in env vars)")
