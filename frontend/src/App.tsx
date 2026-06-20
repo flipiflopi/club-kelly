@@ -35,7 +35,7 @@ export default function App() {
         </Link>
         <div className="flex items-center gap-3">
           <a
-            href="https://x.com/ClubKelly"
+            href="https://x.com/ClubKellyBet"
             target="_blank"
             rel="noopener noreferrer"
             className="text-gray-400 hover:text-gray-900 transition-colors p-1"
