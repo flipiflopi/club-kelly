@@ -36,7 +36,7 @@ def post_tweet(text: str, getxapi_key: str, auth_token: str, ct0: str = "", twid
         req.add_header("Authorization", f"Bearer {getxapi_key}")
         req.add_header("Content-Type", "application/json")
 
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=45) as resp:
             body = json.loads(resp.read())
             tweet_id = body.get("data", {}).get("id_str") or body.get("id_str") or "?"
             logger.info("Tweet posted via GetXAPI: id=%s", tweet_id)
