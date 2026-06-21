@@ -28,6 +28,18 @@ risk:
 
 data:
   fixture_source: OddsApiFixtureSource
+  results_source: FootballDataFixtureSource   # fallback for sync_results (free tier)
+  results_competition_code: WC
   odds_source: TheOddsApiSource
   odds_sport_key: soccer_fifa_world_cup
   historical_source: KaggleInternationalSource
+
+# Map football-data.org team names → The Odds API names (stored in DB)
+team_aliases:
+  "Ivory Coast": "Côte d'Ivoire"
+  "United States": "USA"
+  "IR Iran": "Iran"
+  "Korea Republic": "South Korea"
+  "Türkiye": "Turkey"
+  "Bosnia and Herzegovina": "Bosnia & Herzegovina"
+  "North Macedonia": "North Macedonia"

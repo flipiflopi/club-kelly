@@ -99,6 +99,9 @@ def sync_results(competition_slug: str, db: Session, days_back: int = 3) -> Sync
     """
     Fetch recently finished matches, update their scores/status in the DB,
     and trigger bet resolution + model retraining for any that just finished.
+
+    Primary source: competition config fixture_source (e.g. The Odds API /scores).
+    Fallback source: results_source (e.g. football-data.org, free tier).
     """
     from backend.app.services.bet_resolver import resolve_bets_for_match
 
@@ -108,13 +111,17 @@ def sync_results(competition_slug: str, db: Session, days_back: int = 3) -> Sync
     competition = _ensure_competition(competition_slug, config, db)
     source = _build_fixture_source(config)
 
-    try:
-        recent = source.get_recent_results(days_back=days_back)
-    except Exception as exc:
-        msg = f"Failed to fetch results: {exc}"
-        logger.error(msg, exc_info=True)
-        stats.errors.append(msg)
-        return stats
+    recent = source.get_recent_results(days_back=days_back)
+
+    # If primary source returned nothing, try the fallback results source
+    if not recent and config.get("data", {}).get("results_source"):
+        logger.info("Primary source returned 0 results — trying fallback results_source")
+        try:
+            fallback = _build_results_source(config)
+            if fallback:
+                recent = fallback.get_recent_results(days_back=days_back)
+        except Exception as exc:
+            logger.warning("Fallback results source failed: %s", exc)
 
     newly_finished: list[Match] = []
 
@@ -122,13 +129,17 @@ def sync_results(competition_slug: str, db: Session, days_back: int = 3) -> Sync
         if fixture.status != "finished":
             continue
         try:
+            # Try external_id match first, then fall back to team names + date
             match = db.query(Match).filter_by(external_id=fixture.external_id).first()
             if match is None:
-                # Match not in DB yet — create it
-                _upsert_fixture(fixture, competition, db, stats)
-                match = db.query(Match).filter_by(external_id=fixture.external_id).first()
+                match = _find_match_by_teams(fixture, competition, db)
 
             if match is None:
+                logger.warning(
+                    "No DB match found for %s vs %s on %s",
+                    fixture.home_team_name, fixture.away_team_name,
+                    fixture.match_date.date(),
+                )
                 continue
 
             was_finished = match.status == MatchStatus.FINISHED
@@ -295,3 +306,55 @@ def _build_fixture_source(config: dict):
         return WorldCup2026FixtureSource(github_token=settings.github_token)
 
     raise ValueError(f"Unknown fixture_source: {source_name}")
+
+
+def _build_results_source(config: dict):
+    """Instantiate the optional fallback results adapter (e.g. football-data.org)."""
+    source_name: str = config.get("data", {}).get("results_source", "")
+    if not source_name:
+        return None
+
+    settings = get_settings()
+
+    if source_name == "FootballDataFixtureSource":
+        from adapters.fixtures.football_data_fixture import FootballDataFixtureSource
+        competition_code = config.get("data", {}).get("results_competition_code", "WC")
+        team_aliases = config.get("team_aliases", {})
+        return FootballDataFixtureSource(
+            api_key=settings.football_data_api_key,
+            competition_code=competition_code,
+            team_aliases=team_aliases,
+        )
+
+    logger.warning("Unknown results_source: %s", source_name)
+    return None
+
+
+def _find_match_by_teams(fixture: "FixtureDTO", competition: "Competition", db: Session) -> "Match | None":
+    """
+    Find a DB match by home/away team names + date (±1 day tolerance).
+    Used when the fixture comes from a different source than the one that
+    created the DB record (different external_id schemes).
+    """
+    from datetime import timedelta
+    from backend.app.models.team import Team
+
+    home_team = db.query(Team).filter_by(name=fixture.home_team_name).first()
+    away_team = db.query(Team).filter_by(name=fixture.away_team_name).first()
+    if not home_team or not away_team:
+        return None
+
+    lo = fixture.match_date - timedelta(hours=26)
+    hi = fixture.match_date + timedelta(hours=26)
+
+    return (
+        db.query(Match)
+        .filter(
+            Match.competition_id == competition.id,
+            Match.home_team_id == home_team.id,
+            Match.away_team_id == away_team.id,
+            Match.match_date >= lo,
+            Match.match_date <= hi,
+        )
+        .first()
+    )

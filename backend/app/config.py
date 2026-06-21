@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""  # channel @name or numeric group/chat ID
 
+    # football-data.org (free results API — fallback when Odds API /scores returns 401)
+    football_data_api_key: str = ""
+
     # Twitter / X via GetXAPI (getxapi.com)
     getxapi_key: str = ""        # GetXAPI account key (Bearer token)
     twitter_auth_token: str = "" # X session cookie: auth_token

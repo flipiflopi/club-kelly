@@ -123,38 +123,97 @@ def resolve_bets_for_match(match: Match, db: Session) -> list[SimulatedBet]:
     return resolved
 
 
-def _notify_resolved(match: Match, bets: list[SimulatedBet], bankroll_after: float, db: Session) -> None:
-    settings = get_settings()
-    if not settings.telegram_bot_token or not settings.telegram_chat_id:
-        return
-    try:
-        from backend.app.services.telegram_notifier import notify_bet_resolved
+def _format_resolved_tweet(
+    home: str, away: str, home_score: int, away_score: int,
+    bet_data: list[dict], bankroll_after: float,
+) -> str:
+    all_won = all(b["status"] == "won" for b in bet_data)
+    all_lost = all(b["status"] == "lost" for b in bet_data)
+    icon = "✅" if all_won else "❌" if all_lost else "↔️"
+    label = "WIN!" if all_won else "Loss" if all_lost else "Mixed"
 
-        bankroll_before = bankroll_after - sum(b.profit_loss for b in bets if b.profit_loss)
-        bet_data = [
-            {
-                "outcome": b.prediction.outcome,
-                "decimal_odds": b.decimal_odds,
-                "stake_amount": b.stake_amount,
-                "profit_loss": b.profit_loss or 0.0,
-                "status": b.status.value if hasattr(b.status, "value") else str(b.status),
-            }
-            for b in bets
-            if b.prediction and b.status.value in ("won", "lost")
-        ]
-        if not bet_data:
-            return
-        notify_bet_resolved(
-            home_team=match.home_team.name,
-            away_team=match.away_team.name,
-            home_score=match.home_score or 0,
-            away_score=match.away_score or 0,
-            bets=bet_data,
-            bankroll_before=bankroll_before,
-            bankroll_after=bankroll_after,
-            token=settings.telegram_bot_token,
-            chat_id=settings.telegram_chat_id,
-        )
-    except Exception as exc:
-        import logging
-        logging.getLogger(__name__).warning("Telegram notify_resolved failed: %s", exc)
+    lines = [
+        f"{icon} {label} · {home} {home_score}–{away_score} {away}",
+        "World Cup 2026",
+        "",
+    ]
+    for b in bet_data:
+        outcome = b["outcome"]
+        if outcome == "home":
+            outcome = home
+        elif outcome == "away":
+            outcome = away
+        elif outcome == "draw":
+            outcome = "Draw"
+        pl = b["profit_loss"]
+        pl_str = f"+{pl:.0f}€" if pl >= 0 else f"{pl:.0f}€"
+        lines.append(f"Kelly bet {outcome} @{b['decimal_odds']:.2f}")
+        lines.append(f"Stake {b['stake_amount']:.0f}€ → {pl_str}")
+
+    lines += [
+        "",
+        f"Bankroll: {bankroll_after:,.0f}€",
+        "",
+        "https://clubkelly.online/",
+        "t.me/Club_Kelly",
+        "#ClubKelly #WorldCup2026",
+    ]
+    tweet = "\n".join(lines)
+    if len(tweet) > 280:
+        tweet = tweet[:277] + "..."
+    return tweet
+
+
+def _notify_resolved(match: Match, bets: list[SimulatedBet], bankroll_after: float, db: Session) -> None:
+    import logging
+    log = logging.getLogger(__name__)
+
+    settings = get_settings()
+
+    bankroll_before = bankroll_after - sum(b.profit_loss for b in bets if b.profit_loss)
+    bet_data = [
+        {
+            "outcome": b.prediction.outcome,
+            "decimal_odds": b.decimal_odds,
+            "stake_amount": b.stake_amount,
+            "profit_loss": b.profit_loss or 0.0,
+            "status": b.status.value if hasattr(b.status, "value") else str(b.status),
+        }
+        for b in bets
+        if b.prediction and b.status.value in ("won", "lost")
+    ]
+    if not bet_data:
+        return
+
+    home = match.home_team.name if match.home_team else "?"
+    away = match.away_team.name if match.away_team else "?"
+    home_score = match.home_score or 0
+    away_score = match.away_score or 0
+
+    # Telegram
+    if settings.telegram_bot_token and settings.telegram_chat_id:
+        try:
+            from backend.app.services.telegram_notifier import notify_bet_resolved
+            notify_bet_resolved(
+                home_team=home,
+                away_team=away,
+                home_score=home_score,
+                away_score=away_score,
+                bets=bet_data,
+                bankroll_before=bankroll_before,
+                bankroll_after=bankroll_after,
+                token=settings.telegram_bot_token,
+                chat_id=settings.telegram_chat_id,
+            )
+        except Exception as exc:
+            log.warning("Telegram notify_resolved failed: %s", exc)
+
+    # Twitter
+    if settings.getxapi_key and settings.twitter_auth_token:
+        try:
+            from backend.app.services.twitter_poster import post_tweet
+            tweet = _format_resolved_tweet(home, away, home_score, away_score, bet_data, bankroll_after)
+            post_tweet(tweet, settings.getxapi_key, settings.twitter_auth_token,
+                       settings.twitter_ct0, settings.twitter_twid)
+        except Exception as exc:
+            log.warning("Twitter notify_resolved failed: %s", exc)
