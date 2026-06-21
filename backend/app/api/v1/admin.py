@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from backend.app.api.deps import get_db_session
 from backend.app.models.bankroll_history import BankrollEventType, BankrollHistory
-from backend.app.models.match import Match
+from backend.app.models.match import Match, MatchStatus
 from backend.app.models.prediction import Prediction
 from backend.app.models.simulated_bet import BetStatus, SimulatedBet
 
@@ -24,6 +24,11 @@ router = APIRouter(
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
+
+
+class ResolveMatchRequest(BaseModel):
+    home_score: int
+    away_score: int
 
 
 class AdjustRequest(BaseModel):
@@ -142,6 +147,70 @@ def adjust_bankroll(body: AdjustRequest, db: Session = Depends(get_db_session)):
     db.commit()
 
     return AdjustResponse(ok=True, balance_before=current, balance_after=new_balance)
+
+
+@router.post("/matches/{match_id}/resolve")
+def resolve_match(match_id: int, body: ResolveMatchRequest, db: Session = Depends(get_db_session)):
+    """
+    Manually set a match result and resolve all open bets for it.
+    Use when the scores API is unavailable (e.g. The Odds API free tier).
+    """
+    from backend.app.services.bet_resolver import resolve_bets_for_match
+
+    match = db.query(Match).filter_by(id=match_id).first()
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    if match.status == MatchStatus.FINISHED:
+        open_bets = db.query(SimulatedBet).filter_by(match_id=match_id, status=BetStatus.OPEN).count()
+        if open_bets == 0:
+            raise HTTPException(status_code=400, detail="Match already finished and no open bets to resolve")
+
+    match.home_score = body.home_score
+    match.away_score = body.away_score
+    match.status = MatchStatus.FINISHED
+    db.flush()
+
+    resolved = resolve_bets_for_match(match, db)
+
+    return {
+        "ok": True,
+        "match_id": match_id,
+        "score": f"{body.home_score}-{body.away_score}",
+        "bets_resolved": len(resolved),
+        "results": [
+            {"bet_id": b.id, "status": b.status.value, "profit_loss": b.profit_loss}
+            for b in resolved
+        ],
+    }
+
+
+@router.get("/matches-with-open-bets")
+def list_matches_with_open_bets(db: Session = Depends(get_db_session)):
+    """Matches that have at least one open bet — for manual resolution."""
+    rows = (
+        db.query(Match)
+        .join(SimulatedBet, SimulatedBet.match_id == Match.id)
+        .filter(SimulatedBet.status == BetStatus.OPEN)
+        .options(
+            joinedload(Match.home_team),
+            joinedload(Match.away_team),
+        )
+        .distinct()
+        .order_by(Match.match_date.asc())
+        .all()
+    )
+    return [
+        {
+            "id": m.id,
+            "home_team": m.home_team.name if m.home_team else "",
+            "away_team": m.away_team.name if m.away_team else "",
+            "match_date": m.match_date.isoformat() if m.match_date else "",
+            "status": m.status.value if hasattr(m.status, "value") else str(m.status),
+            "home_score": m.home_score,
+            "away_score": m.away_score,
+        }
+        for m in rows
+    ]
 
 
 @router.get("/activity")

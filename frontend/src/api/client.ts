@@ -21,6 +21,16 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export type MatchWithOpenBets = {
+  id: number;
+  home_team: string;
+  away_team: string;
+  match_date: string;
+  status: string;
+  home_score: number | null;
+  away_score: number | null;
+};
+
 export type AdminBet = {
   id: number;
   match_id: number;
@@ -74,4 +84,11 @@ export const api = {
     ),
   adminGetActivity: (limit = 50) =>
     get<ActivityEvent[]>(`/v1/admin/activity?limit=${limit}`),
+  adminGetMatchesWithOpenBets: () =>
+    get<MatchWithOpenBets[]>("/v1/admin/matches-with-open-bets"),
+  adminResolveMatch: (matchId: number, homeScore: number, awayScore: number) =>
+    post<{ ok: boolean; match_id: number; score: string; bets_resolved: number }>(
+      `/v1/admin/matches/${matchId}/resolve`,
+      { home_score: homeScore, away_score: awayScore }
+    ),
 };

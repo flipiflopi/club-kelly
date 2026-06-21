@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { usePolling } from "../api/usePolling";
-import type { AdminBet, ActivityEvent } from "../api/client";
+import type { AdminBet, ActivityEvent, MatchWithOpenBets } from "../api/client";
 
 function fmt(n: number) {
   return `${n >= 0 ? "+" : ""}${n.toFixed(2)}€`;
@@ -14,6 +14,122 @@ const EVENT_LABELS: Record<string, string> = {
   bet_resolved: "Result",
   adjustment: "Adjustment",
 };
+
+// ── Resolve match ──────────────────────────────────────────────────────────────
+
+function ResolveMatchPanel({
+  matches,
+  loading,
+  onRefresh,
+}: {
+  matches: MatchWithOpenBets[];
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  const [scores, setScores] = useState<Record<number, { home: string; away: string }>>({});
+  const [resolving, setResolving] = useState<number | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  function setScore(id: number, side: "home" | "away", val: string) {
+    setScores((prev) => ({ ...prev, [id]: { ...prev[id], [side]: val } }));
+  }
+
+  async function handleResolve(m: MatchWithOpenBets) {
+    const s = scores[m.id];
+    const home = parseInt(s?.home ?? "");
+    const away = parseInt(s?.away ?? "");
+    if (isNaN(home) || isNaN(away)) {
+      setMessage("Enter both scores before resolving.");
+      return;
+    }
+    if (!confirm(`Set ${m.home_team} ${home}-${away} ${m.away_team} and resolve bets?`)) return;
+    setResolving(m.id);
+    setMessage(null);
+    try {
+      const r = await api.adminResolveMatch(m.id, home, away);
+      setMessage(`✅ Match resolved ${r.score} — ${r.bets_resolved} bet(s) settled`);
+      onRefresh();
+    } catch (e: unknown) {
+      setMessage(`❌ ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setResolving(null);
+    }
+  }
+
+  if (!loading && matches.length === 0) return null;
+
+  return (
+    <section>
+      <h2 className="text-xs font-semibold text-orange-500 uppercase tracking-widest font-mono mb-1">
+        Resolve matches manually
+      </h2>
+      <p className="text-xs text-gray-400 mb-4">
+        The Odds API free tier does not include results. Enter scores to settle open bets.
+      </p>
+
+      {message && (
+        <div className="mb-4 text-sm px-3 py-2 rounded border border-gray-200 text-gray-700 bg-gray-50">
+          {message}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="space-y-2">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="h-12 bg-gray-50 rounded-lg animate-pulse border border-gray-100" />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {matches.map((m) => {
+            const d = new Date(m.match_date).toLocaleDateString("en-GB", {
+              day: "numeric", month: "short",
+            });
+            return (
+              <div
+                key={m.id}
+                className="border border-orange-100 rounded-lg px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-900 truncate">
+                    {m.home_team} vs {m.away_team}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-0.5">{d} · {m.status}</div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="H"
+                    value={scores[m.id]?.home ?? ""}
+                    onChange={(e) => setScore(m.id, "home", e.target.value)}
+                    className="w-14 border border-gray-200 rounded px-2 py-1.5 text-center text-sm font-mono focus:outline-none focus:border-gray-900"
+                  />
+                  <span className="text-gray-300 font-bold">–</span>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="A"
+                    value={scores[m.id]?.away ?? ""}
+                    onChange={(e) => setScore(m.id, "away", e.target.value)}
+                    className="w-14 border border-gray-200 rounded px-2 py-1.5 text-center text-sm font-mono focus:outline-none focus:border-gray-900"
+                  />
+                  <button
+                    onClick={() => handleResolve(m)}
+                    disabled={resolving === m.id}
+                    className="text-xs px-3 py-1.5 rounded bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-40 transition font-medium"
+                  >
+                    {resolving === m.id ? "Resolving…" : "Resolve"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
 
 // ── Open-bet table ─────────────────────────────────────────────────────────────
 
@@ -265,6 +381,12 @@ export default function Admin() {
   } = usePolling(api.adminGetOpenBets, 30_000);
 
   const {
+    data: pendingMatches,
+    loading: pendingLoading,
+    refresh: refreshPending,
+  } = usePolling(api.adminGetMatchesWithOpenBets, 30_000);
+
+  const {
     data: activity,
     loading: actLoading,
     refresh: refreshActivity,
@@ -272,6 +394,7 @@ export default function Admin() {
 
   function refreshAll() {
     refreshBets();
+    refreshPending();
     refreshActivity();
   }
 
@@ -295,6 +418,11 @@ export default function Admin() {
       </div>
 
       <div className="space-y-10">
+        <ResolveMatchPanel
+          matches={pendingMatches ?? []}
+          loading={pendingLoading}
+          onRefresh={refreshAll}
+        />
         <OpenBetsPanel
           bets={openBets ?? []}
           loading={betsLoading}
