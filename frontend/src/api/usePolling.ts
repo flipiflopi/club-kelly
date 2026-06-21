@@ -8,10 +8,12 @@ export function usePolling<T>(
   const [error, setError] = useState<Error | null>(null);
   const [loading, setLoading] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fetcherRef = useRef(fetcher);
+  fetcherRef.current = fetcher;
 
   const doFetch = useCallback(async () => {
     try {
-      const result = await fetcher();
+      const result = await fetcherRef.current();
       setData(result);
       setError(null);
     } catch (err) {
@@ -19,7 +21,7 @@ export function usePolling<T>(
     } finally {
       setLoading(false);
     }
-  }, [fetcher]);
+  }, []); // stable ref — fetcher changes don't recreate this
 
   useEffect(() => {
     doFetch();
