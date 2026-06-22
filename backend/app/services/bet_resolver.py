@@ -85,6 +85,11 @@ def resolve_bets_for_match(match: Match, db: Session) -> list[SimulatedBet]:
     # Bankroll only changes at resolution, never at bet placement.
     running_balance = _get_current_bankroll(db)
 
+    # Collect notification data BEFORE commit (while ORM objects are loaded)
+    notify_payload: dict | None = None
+    home_name = match.home_team.name if match.home_team else "?"
+    away_name = match.away_team.name if match.away_team else "?"
+
     for bet in open_bets:
         status = _determine_outcome(bet, match)
 
@@ -115,10 +120,38 @@ def resolve_bets_for_match(match: Match, db: Session) -> list[SimulatedBet]:
 
         resolved.append(bet)
 
+    # Build notification payload while session is clean (before commit expires objects)
+    resolved_bet_data = []
+    bankroll_before = running_balance
+    for bet in resolved:
+        outcome = bet.prediction.outcome if bet.prediction else ""
+        status_val = bet.status.value if hasattr(bet.status, "value") else str(bet.status)
+        if status_val in ("won", "lost"):
+            resolved_bet_data.append({
+                "outcome": outcome,
+                "decimal_odds": bet.decimal_odds,
+                "stake_amount": bet.stake_amount,
+                "profit_loss": bet.profit_loss or 0.0,
+                "status": status_val,
+            })
+            bankroll_before -= (bet.profit_loss or 0.0)
+
+    if resolved_bet_data:
+        notify_payload = {
+            "home": home_name,
+            "away": away_name,
+            "home_score": match.home_score or 0,
+            "away_score": match.away_score or 0,
+            "bets": resolved_bet_data,
+            "bankroll_before": bankroll_before,
+            "bankroll_after": running_balance,
+        }
+
     db.commit()
 
-    if resolved:
-        _notify_resolved(match, resolved, running_balance, db)
+    # Notify AFTER commit, using pre-collected plain-Python data (no ORM access)
+    if notify_payload:
+        _notify_resolved(notify_payload)
 
     return resolved
 
@@ -164,56 +197,59 @@ def _format_resolved_tweet(
     return tweet
 
 
-def _notify_resolved(match: Match, bets: list[SimulatedBet], bankroll_after: float, db: Session) -> None:
+def _notify_resolved(payload: dict) -> None:
+    """
+    Send Telegram + Twitter notifications for resolved bets.
+    Runs in a background thread so it never blocks the DB session.
+    All data is passed as plain Python dicts — no ORM access here.
+    """
     import logging
+    import threading
+
     log = logging.getLogger(__name__)
 
-    settings = get_settings()
-
-    bankroll_before = bankroll_after - sum(b.profit_loss for b in bets if b.profit_loss)
-    bet_data = [
-        {
-            "outcome": b.prediction.outcome,
-            "decimal_odds": b.decimal_odds,
-            "stake_amount": b.stake_amount,
-            "profit_loss": b.profit_loss or 0.0,
-            "status": b.status.value if hasattr(b.status, "value") else str(b.status),
-        }
-        for b in bets
-        if b.prediction and b.status.value in ("won", "lost")
-    ]
-    if not bet_data:
-        return
-
-    home = match.home_team.name if match.home_team else "?"
-    away = match.away_team.name if match.away_team else "?"
-    home_score = match.home_score or 0
-    away_score = match.away_score or 0
-
-    # Telegram
-    if settings.telegram_bot_token and settings.telegram_chat_id:
+    def _send() -> None:
         try:
-            from backend.app.services.telegram_notifier import notify_bet_resolved
-            notify_bet_resolved(
-                home_team=home,
-                away_team=away,
-                home_score=home_score,
-                away_score=away_score,
-                bets=bet_data,
-                bankroll_before=bankroll_before,
-                bankroll_after=bankroll_after,
-                token=settings.telegram_bot_token,
-                chat_id=settings.telegram_chat_id,
-            )
-        except Exception as exc:
-            log.warning("Telegram notify_resolved failed: %s", exc)
+            settings = get_settings()
+            home = payload["home"]
+            away = payload["away"]
+            home_score = payload["home_score"]
+            away_score = payload["away_score"]
+            bet_data = payload["bets"]
+            bankroll_before = payload["bankroll_before"]
+            bankroll_after = payload["bankroll_after"]
 
-    # Twitter
-    if settings.getxapi_key and settings.twitter_auth_token:
-        try:
-            from backend.app.services.twitter_poster import post_tweet
-            tweet = _format_resolved_tweet(home, away, home_score, away_score, bet_data, bankroll_after)
-            post_tweet(tweet, settings.getxapi_key, settings.twitter_auth_token,
-                       settings.twitter_ct0, settings.twitter_twid)
+            if not bet_data:
+                return
+
+            # Telegram
+            if settings.telegram_bot_token and settings.telegram_chat_id:
+                try:
+                    from backend.app.services.telegram_notifier import notify_bet_resolved
+                    notify_bet_resolved(
+                        home_team=home,
+                        away_team=away,
+                        home_score=home_score,
+                        away_score=away_score,
+                        bets=bet_data,
+                        bankroll_before=bankroll_before,
+                        bankroll_after=bankroll_after,
+                        token=settings.telegram_bot_token,
+                        chat_id=settings.telegram_chat_id,
+                    )
+                except Exception as exc:
+                    log.warning("Telegram notify_resolved failed: %s", exc)
+
+            # Twitter
+            if settings.getxapi_key and settings.twitter_auth_token:
+                try:
+                    from backend.app.services.twitter_poster import post_tweet
+                    tweet = _format_resolved_tweet(home, away, home_score, away_score, bet_data, bankroll_after)
+                    post_tweet(tweet, settings.getxapi_key, settings.twitter_auth_token,
+                               settings.twitter_ct0, settings.twitter_twid)
+                except Exception as exc:
+                    log.warning("Twitter notify_resolved failed: %s", exc)
         except Exception as exc:
-            log.warning("Twitter notify_resolved failed: %s", exc)
+            logging.getLogger(__name__).warning("_notify_resolved background thread failed: %s", exc)
+
+    threading.Thread(target=_send, daemon=True).start()

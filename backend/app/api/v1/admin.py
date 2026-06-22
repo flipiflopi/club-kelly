@@ -187,15 +187,19 @@ def resolve_match(match_id: int, body: ResolveMatchRequest, db: Session = Depend
 @router.get("/matches-with-open-bets")
 def list_matches_with_open_bets(db: Session = Depends(get_db_session)):
     """Matches that have at least one open bet — for manual resolution."""
+    open_match_ids = (
+        db.query(SimulatedBet.match_id)
+        .filter(SimulatedBet.status == BetStatus.OPEN)
+        .distinct()
+        .subquery()
+    )
     rows = (
         db.query(Match)
-        .join(SimulatedBet, SimulatedBet.match_id == Match.id)
-        .filter(SimulatedBet.status == BetStatus.OPEN)
+        .filter(Match.id.in_(open_match_ids))
         .options(
             joinedload(Match.home_team),
             joinedload(Match.away_team),
         )
-        .distinct()
         .order_by(Match.match_date.asc())
         .all()
     )
