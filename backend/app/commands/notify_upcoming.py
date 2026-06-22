@@ -2,9 +2,9 @@
 Pre-match notification command.
 
 Sends a tweet + Telegram message for matches kicking off in approximately
-24 hours or 4 hours. Designed to run every 30 minutes via a scheduled task.
+4 hours. Designed to run every 30 minutes via a scheduled task.
 
-Each window is ±15 minutes around the target (24h / 4h), so with a 30-minute
+Each window is ±15 minutes around the target (4h), so with a 30-minute
 cron interval every match gets exactly one notification per window.
 
 Usage:
@@ -23,7 +23,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 WINDOW_MINUTES = 15  # ±15 min around target → 30-min safe zone per cron cycle
-TARGETS_HOURS = [24, 4]
+TARGETS_HOURS = [4]
 
 
 def _window(hours: int, now: datetime) -> tuple[datetime, datetime]:
@@ -114,7 +114,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Send pre-match notifications")
     parser.add_argument("--dry-run", action="store_true", help="Print messages without sending")
     parser.add_argument("--match-id", type=int, default=None, help="Force notification for a specific match ID (ignores time window)")
-    parser.add_argument("--hours", type=int, default=24, help="Hours label to use in the message when --match-id is set (default: 24)")
+    parser.add_argument("--hours", type=int, default=4, help="Hours label to use in the message when --match-id is set (default: 4)")
     args = parser.parse_args()
 
     from backend.app.config import get_settings
