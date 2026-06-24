@@ -76,8 +76,9 @@ def sync_fixtures(competition_slug: str, db: Session) -> SyncStats:
         try:
             _upsert_fixture(fixture, competition, db, stats)
         except Exception as exc:
+            db.rollback()  # prevent PendingRollbackError on the outer commit
             msg = f"Fixture {fixture.external_id}: {exc}"
-            logger.warning(msg)
+            logger.warning(msg, exc_info=True)
             stats.errors.append(msg)
 
     db.commit()
@@ -166,8 +167,9 @@ def sync_results(competition_slug: str, db: Session, days_back: int = 3) -> Sync
                 )
 
         except Exception as exc:
+            db.rollback()  # prevent PendingRollbackError on the outer commit
             msg = f"Result {fixture.external_id}: {exc}"
-            logger.warning(msg)
+            logger.warning(msg, exc_info=True)
             stats.errors.append(msg)
 
     db.commit()

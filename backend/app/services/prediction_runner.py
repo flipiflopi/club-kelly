@@ -209,10 +209,10 @@ def _run_for_competition(
             result.bets_placed += n_bets
             if n_preds > 0 and n_bets > 0:
                 result.bet_match_ids.append(match.id)
-                _notify_bet_placed(match, db)
+                _notify_bet_placed_async(match, db)
             elif n_preds > 0:
                 result.no_bet_match_ids.append(match.id)
-                _notify_no_bet(match, db)
+                # No notification for no-bet matches — would spam the channel
         except Exception as exc:
             msg = f"Match {match.id}: {exc}"
             logger.error(msg, exc_info=True)
@@ -662,52 +662,20 @@ def _fetch_odds_map(match: Match, odds_source) -> dict[str, dict[str, float]]:
 # ── Private: Telegram helpers ─────────────────────────────────────────────────
 
 
-def _notify_no_bet(match: Match, db: Session) -> None:
+def _notify_bet_placed_async(match: Match, db: Session) -> None:
+    """
+    Send Telegram notification for a newly placed bet.
+    Runs in a background thread so it never blocks the prediction runner handler.
+    Data is extracted from ORM objects here (while session is active), then
+    the HTTP call happens in the thread with no DB access.
+    """
+    import threading
+
     settings = get_settings()
     if not settings.telegram_bot_token or not settings.telegram_chat_id:
         return
+
     try:
-        from backend.app.services.telegram_notifier import notify_no_bet
-
-        preds = (
-            db.query(Prediction)
-            .join(Prediction.market_type)
-            .filter(
-                Prediction.match_id == match.id,
-                Prediction.model_version == MODEL_VERSION,
-            )
-            .all()
-        )
-        mr_preds = [p for p in preds if p.market_type and p.market_type.slug == "match_result"]
-        pred_data = [
-            {
-                "outcome": p.outcome,
-                "model_probability": round(p.model_probability * 100, 1),
-                "market_odds": p.market_odds,
-                "edge_pct": round(p.edge * 100, 1) if p.edge else None,
-            }
-            for p in mr_preds
-        ]
-        notify_no_bet(
-            home_team=match.home_team.name,
-            away_team=match.away_team.name,
-            match_date=match.match_date,
-            round_name=match.round,
-            predictions=pred_data,
-            token=settings.telegram_bot_token,
-            chat_id=settings.telegram_chat_id,
-        )
-    except Exception as exc:
-        logger.warning("Telegram notify_no_bet failed: %s", exc)
-
-
-def _notify_bet_placed(match: Match, db: Session) -> None:
-    settings = get_settings()
-    if not settings.telegram_bot_token or not settings.telegram_chat_id:
-        return
-    try:
-        from backend.app.services.telegram_notifier import notify_bet_placed
-
         bets = (
             db.query(SimulatedBet)
             .join(SimulatedBet.prediction)
@@ -718,27 +686,36 @@ def _notify_bet_placed(match: Match, db: Session) -> None:
             )
             .all()
         )
-        bet_data = [
-            {
-                "outcome": b.prediction.outcome,
-                "model_probability": round(b.prediction.model_probability * 100, 1),
-                "market_odds": b.prediction.market_odds,
-                "edge_pct": round(b.prediction.edge * 100, 1) if b.prediction.edge else None,
-                "stake_amount": b.stake_amount,
-                "stake_pct": round(b.stake_pct * 100, 1),
-                "decimal_odds": b.decimal_odds,
-            }
-            for b in bets
-        ]
-        notify_bet_placed(
-            home_team=match.home_team.name,
-            away_team=match.away_team.name,
-            match_date=match.match_date,
-            round_name=match.round,
-            bets=bet_data,
-            current_bankroll=_get_current_bankroll(db),
-            token=settings.telegram_bot_token,
-            chat_id=settings.telegram_chat_id,
-        )
+        payload = {
+            "home_team": match.home_team.name if match.home_team else "?",
+            "away_team": match.away_team.name if match.away_team else "?",
+            "match_date": match.match_date,
+            "round_name": match.round,
+            "bets": [
+                {
+                    "outcome": b.prediction.outcome,
+                    "model_probability": round(b.prediction.model_probability * 100, 1),
+                    "market_odds": b.prediction.market_odds,
+                    "edge_pct": round(b.prediction.edge * 100, 1) if b.prediction.edge else None,
+                    "stake_amount": b.stake_amount,
+                    "stake_pct": round(b.stake_pct * 100, 1),
+                    "decimal_odds": b.decimal_odds,
+                }
+                for b in bets
+            ],
+            "current_bankroll": _get_current_bankroll(db),
+            "token": settings.telegram_bot_token,
+            "chat_id": settings.telegram_chat_id,
+        }
     except Exception as exc:
-        logger.warning("Telegram notify_bet_placed failed: %s", exc)
+        logger.warning("Could not build bet_placed notification payload: %s", exc)
+        return
+
+    def _send() -> None:
+        try:
+            from backend.app.services.telegram_notifier import notify_bet_placed
+            notify_bet_placed(**payload)
+        except Exception as exc:
+            logger.warning("Telegram notify_bet_placed failed: %s", exc)
+
+    threading.Thread(target=_send, daemon=True).start()
