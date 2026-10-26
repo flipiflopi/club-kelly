@@ -1,12 +1,12 @@
 <div align="center">
 
-# ⚽ Club Kelly
+# ⚽ Club Kelly: Football Match Prediction
 
 **A football match prediction and value-betting engine that paper-trades its own picks.**
 
 Dixon-Coles + Elo ensemble · edge detection against de-vigged bookmaker odds · fractional Kelly staking · layered risk controls
 
-[![CI](https://github.com/flipiflopi/club-kelly/actions/workflows/ci.yml/badge.svg)](https://github.com/flipiflopi/club-kelly/actions/workflows/ci.yml)
+[![CI](https://github.com/flipiflopi/club-kelly-football-match-prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/flipiflopi/club-kelly-football-match-prediction/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.12+-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React_19-20232A?logo=react&logoColor=61DAFB)
