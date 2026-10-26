@@ -1,6 +1,6 @@
 """
 Admin API — manual management of bets and bankroll.
-Protected by the same X-API-Key used for webhooks.
+Every endpoint requires the X-API-Key header (ADMIN_API_KEY, or WEBHOOK_API_KEY as fallback).
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query  # noqa: F401
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
-from backend.app.api.deps import get_db_session
+from backend.app.api.deps import get_db_session, verify_admin_key
 from backend.app.models.bankroll_history import BankrollEventType, BankrollHistory
 from backend.app.models.match import Match, MatchStatus
 from backend.app.models.prediction import Prediction
@@ -20,6 +20,7 @@ from backend.app.models.simulated_bet import BetStatus, SimulatedBet
 router = APIRouter(
     prefix="/admin",
     tags=["admin"],
+    dependencies=[Depends(verify_admin_key)],
 )
 
 

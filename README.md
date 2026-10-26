@@ -180,6 +180,7 @@ All settings are read from environment variables (or `.env`).
 | `THE_ODDS_API_KEY` | For live data | [The Odds API](https://the-odds-api.com) key — fixtures and odds |
 | `FOOTBALL_DATA_API_KEY` | For results | [football-data.org](https://www.football-data.org) key — finished match results |
 | `WEBHOOK_API_KEY` | Recommended | Shared secret expected in the `X-API-Key` header of webhook calls (empty disables auth) |
+| `ADMIN_API_KEY` | For the admin panel | Key required by `/admin` and `/v1/admin/*` (falls back to `WEBHOOK_API_KEY`; if both are empty the admin API is disabled) |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Optional | Publish picks and results to a Telegram channel |
 | `GETXAPI_KEY`, `TWITTER_AUTH_TOKEN`, `TWITTER_CT0`, `TWITTER_TWID` | Optional | Publish to X through [GetXAPI](https://www.getxapi.com) |
 | `GITHUB_TOKEN` | Optional | Raises GitHub API rate limits for the worldcup2026 fixture source |

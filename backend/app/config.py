@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # n8n webhooks
     webhook_api_key: str = ""   # empty = no auth required
 
+    # Admin panel — falls back to webhook_api_key; if both are empty the admin API is disabled
+    admin_api_key: str = ""
+
     # Telegram notifications
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""  # channel @name or numeric group/chat ID

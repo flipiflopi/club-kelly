@@ -2,21 +2,66 @@ import type { Bet, BankrollEvent, BankrollSnapshot, Match } from "../types/api";
 
 const BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
+// ── Admin key (kept in this browser only) ─────────────────────────────────────
+
+const ADMIN_KEY_STORAGE = "clubkelly_admin_key";
+
+export function getAdminKey(): string | null {
+  try {
+    return localStorage.getItem(ADMIN_KEY_STORAGE);
+  } catch {
+    return null;
+  }
+}
+
+export function setAdminKey(key: string): void {
+  try {
+    localStorage.setItem(ADMIN_KEY_STORAGE, key);
+  } catch {
+    /* storage unavailable — key lives only for this page load */
+  }
+}
+
+export function clearAdminKey(): void {
+  try {
+    localStorage.removeItem(ADMIN_KEY_STORAGE);
+  } catch {
+    /* ignore */
+  }
+}
+
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function authHeaders(path: string): Record<string, string> {
+  const key = path.startsWith("/v1/admin") ? getAdminKey() : null;
+  return key ? { "X-API-Key": key } : {};
+}
+
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
+  const res = await fetch(`${BASE}${path}`, { headers: authHeaders(path) });
+  if (!res.ok) throw new ApiError(`API error ${res.status}: ${path}`, res.status);
   return res.json() as Promise<T>;
 }
 
 async function post<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
-    headers: body != null ? { "Content-Type": "application/json" } : {},
+    headers: {
+      ...authHeaders(path),
+      ...(body != null ? { "Content-Type": "application/json" } : {}),
+    },
     body: body != null ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
     const detail = await res.json().then((d) => d?.detail ?? res.statusText).catch(() => res.statusText);
-    throw new Error(detail);
+    throw new ApiError(detail, res.status);
   }
   return res.json() as Promise<T>;
 }

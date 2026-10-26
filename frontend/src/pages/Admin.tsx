@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api/client";
+import { ApiError, api, clearAdminKey, getAdminKey, setAdminKey } from "../api/client";
 import { usePolling } from "../api/usePolling";
 import type { AdminBet, ActivityEvent, MatchWithOpenBets } from "../api/client";
 
@@ -373,12 +373,93 @@ function ActivityPanel({
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+// ── Key gate ───────────────────────────────────────────────────────────────────
+
+function AdminLogin({ onLogin, error }: { onLogin: () => void; error: string | null }) {
+  const [key, setKey] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [message, setMessage] = useState<string | null>(error);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!key.trim()) return;
+    setChecking(true);
+    setMessage(null);
+    setAdminKey(key.trim());
+    try {
+      await api.adminGetActivity(1);
+      onLogin();
+    } catch (err: unknown) {
+      clearAdminKey();
+      if (err instanceof ApiError && err.status === 401) setMessage("Invalid key.");
+      else if (err instanceof ApiError && err.status === 503) setMessage("Admin API is disabled on the server (ADMIN_API_KEY not set).");
+      else setMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  return (
+    <div className="max-w-sm mx-auto px-6 py-24">
+      <Link
+        to="/"
+        className="text-xs text-gray-400 hover:text-gray-900 transition-colors flex items-center gap-1 mb-8"
+      >
+        ← Club Kelly
+      </Link>
+      <h1 className="text-3xl font-black tracking-tight mb-6">Admin</h1>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <input
+          type="password"
+          autoComplete="current-password"
+          placeholder="Admin API key"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          className="w-full border border-gray-200 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-gray-900"
+        />
+        <button
+          type="submit"
+          disabled={checking || !key.trim()}
+          className="w-full text-sm px-3 py-2 rounded bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-40 transition font-medium"
+        >
+          {checking ? "Checking…" : "Unlock"}
+        </button>
+        {message && <p className="text-xs text-red-500">{message}</p>}
+      </form>
+    </div>
+  );
+}
+
 export default function Admin() {
+  const [authed, setAuthed] = useState(() => getAdminKey() !== null);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!authed) return <AdminLogin onLogin={() => setAuthed(true)} error={error} />;
+
+  return (
+    <AdminDashboard
+      onLogout={(reason) => {
+        clearAdminKey();
+        setError(reason);
+        setAuthed(false);
+      }}
+    />
+  );
+}
+
+function AdminDashboard({ onLogout }: { onLogout: (reason: string | null) => void }) {
   const {
     data: openBets,
     loading: betsLoading,
+    error: betsError,
     refresh: refreshBets,
   } = usePolling(api.adminGetOpenBets, 30_000);
+
+  useEffect(() => {
+    if (betsError instanceof ApiError && (betsError.status === 401 || betsError.status === 503)) {
+      onLogout("Your saved key is no longer valid.");
+    }
+  }, [betsError, onLogout]);
 
   const {
     data: pendingMatches,
@@ -409,12 +490,20 @@ export default function Admin() {
 
       <div className="flex items-center justify-between mb-10">
         <h1 className="text-3xl font-black tracking-tight">Admin</h1>
-        <button
-          onClick={refreshAll}
-          className="text-xs text-gray-400 hover:text-gray-900 transition-colors px-3 py-1.5 border border-gray-200 rounded hover:border-gray-400"
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={refreshAll}
+            className="text-xs text-gray-400 hover:text-gray-900 transition-colors px-3 py-1.5 border border-gray-200 rounded hover:border-gray-400"
+          >
+            Refresh
+          </button>
+          <button
+            onClick={() => onLogout(null)}
+            className="text-xs text-gray-400 hover:text-gray-900 transition-colors px-3 py-1.5 border border-gray-200 rounded hover:border-gray-400"
+          >
+            Lock
+          </button>
+        </div>
       </div>
 
       <div className="space-y-10">
