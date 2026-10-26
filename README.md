@@ -12,6 +12,7 @@ Dixon-Coles + Elo ensemble · edge detection against de-vigged bookmaker odds ·
 ![React](https://img.shields.io/badge/React_19-20232A?logo=react&logoColor=61DAFB)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL_16-4169E1?logo=postgresql&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 [Live site](https://clubkelly.online) · [X / Twitter](https://x.com/ClubKellyBet) · [Telegram](https://t.me/Club_Kelly)
 
@@ -247,6 +248,10 @@ The same checks run on every push through [GitHub Actions](.github/workflows/ci.
 - [ ] Club competitions (La Liga, Champions League) — configs ready, adapters in progress
 - [ ] Closing-line value (CLV) tracking on the public dashboard
 - [ ] AI-written match previews and bet rationales
+
+## License
+
+Released under the [MIT License](LICENSE).
 
 ## Disclaimer
 
