@@ -1,7 +1,7 @@
 [project]
-name = "football-prediction"
+name = "club-kelly"
 version = "0.1.0"
-description = "Football prediction paper trading system"
+description = "Football match prediction and value-betting engine (Dixon-Coles + Elo ensemble, fractional Kelly) with paper trading"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",

@@ -37,7 +37,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title="Football Prediction API",
+        title="Club Kelly API",
         version="0.1.0",
         debug=settings.debug,
         lifespan=lifespan,

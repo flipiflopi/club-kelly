@@ -14,7 +14,7 @@ DEFAULT_ODDS = 2.10
 
 def test_allowed_bet_passes_all_filters():
     result = apply_risk_filters(
-        proposed_stake_pct=0.03,       # 3% — within 5% limit
+        proposed_stake_pct=0.03,       # 3% — at the 3% per-bet limit
         decimal_odds=2.10,
         current_bankroll=DEFAULT_BANKROLL,
         open_exposure_eur=0.0,         # no existing exposure
@@ -43,11 +43,11 @@ def test_zero_stake_rejected():
 
 
 def test_stake_capped_at_per_match_limit():
-    # Propose 10% — should be capped at 5% (max_bet_pct default)
+    # Propose 10% — should be capped at 3% (max_bet_pct default)
     result = apply_risk_filters(0.10, decimal_odds=2.10, current_bankroll=1000.0, open_exposure_eur=0.0)
     assert result.allowed is True
-    assert result.final_stake_pct == pytest.approx(0.05)
-    assert result.final_stake_eur == pytest.approx(50.0)
+    assert result.final_stake_pct == pytest.approx(0.03)
+    assert result.final_stake_eur == pytest.approx(30.0)
 
 
 def test_daily_exposure_limit_blocks():
@@ -63,16 +63,16 @@ def test_daily_exposure_limit_blocks():
 
 
 def test_daily_exposure_trims_stake():
-    # 120€ open, limit 150€ → only 30€ remaining capacity
-    # propose 4% = 40€, which exceeds the 30€ remaining → trimmed to 30€
+    # 130€ open, limit 150€ → only 20€ remaining capacity
+    # propose 3% = 30€, which exceeds the 20€ remaining → trimmed to 20€
     result = apply_risk_filters(
-        proposed_stake_pct=0.04,       # 40€ requested
+        proposed_stake_pct=0.03,       # 30€ requested
         decimal_odds=2.10,
         current_bankroll=1000.0,
-        open_exposure_eur=120.0,
+        open_exposure_eur=130.0,
     )
     assert result.allowed is True
-    assert result.final_stake_eur == pytest.approx(30.0)
+    assert result.final_stake_eur == pytest.approx(20.0)
     assert "trimmed" in (result.note or "")
 
 
